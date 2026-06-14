@@ -31,6 +31,7 @@ var current_stone: RigidBody2D = null
 var stones: Array[RigidBody2D] = []
 var loading_lb: bool = false
 var last_action_ms: int = 0
+var theme: Dictionary = {}
 
 var camera: Camera2D
 var score_label: Label
@@ -39,6 +40,7 @@ var dust: CPUParticles2D
 
 func _ready() -> void:
 	randomize()
+	_load_theme()
 	_setup_background()
 	_setup_camera()
 	_setup_ui()
@@ -53,6 +55,16 @@ func _setup_background() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = -10
 	add_child(layer)
+
+	# Если у темы есть картинка фона — используем её вместо векторного неба.
+	var bg_tex: Texture2D = theme.get("background")
+	if bg_tex:
+		var bg := TextureRect.new()
+		bg.texture = bg_tex
+		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		layer.add_child(bg)
+		return
 
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
@@ -127,7 +139,11 @@ func _setup_pedestal() -> void:
 	shadow.color = Color(0.3, 0.18, 0.12, 0.32)
 	shadow.position = Vector2(0, 40)
 	ped.add_child(shadow)
-	ped.add_child(_make_rock(Vector2(STONE_SIZE.x, 60.0), Color("6E635C")))
+	var ped_tex: Texture2D = theme.get("pedestal")
+	if ped_tex:
+		ped.add_child(_sprite_scaled_to_width(ped_tex, STONE_SIZE.x))
+	else:
+		ped.add_child(_make_rock(Vector2(STONE_SIZE.x, 60.0), Color("6E635C")))
 	add_child(ped)
 	ground_top_y = pedestal_y - 30.0
 	top_y = ground_top_y
@@ -155,8 +171,10 @@ func _spawn_carrier() -> void:
 	carrier = Node2D.new()
 	carrier.position = Vector2(MARGIN, top_y - CARRIER_GAP)
 	var color := _stone_color()
+	var idx := _pick_stone()
 	carrier.set_meta("stone_color", color)
-	var rock := _make_rock(STONE_SIZE, color)
+	carrier.set_meta("stone_idx", idx)
+	var rock := _stone_visual(STONE_SIZE, color, idx)
 	carrier.add_child(rock)
 	carrier.set_meta("rock_node", rock)
 	_add_hand_top(carrier, STONE_SIZE)
@@ -222,6 +240,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _drop() -> void:
 	var color: Color = carrier.get_meta("stone_color")
+	var idx: int = carrier.get_meta("stone_idx")
 	var drop_pos: Vector2 = carrier.position
 	_animate_release(carrier)
 	carrier = null
@@ -237,7 +256,7 @@ func _drop() -> void:
 	rect.size = STONE_SIZE
 	shape.shape = rect
 	stone.add_child(shape)
-	stone.add_child(_make_rock(STONE_SIZE, color))
+	stone.add_child(_stone_visual(STONE_SIZE, color, idx))
 	var mat := PhysicsMaterial.new()
 	mat.friction = 0.9
 	mat.bounce = 0.0
@@ -344,6 +363,47 @@ func _animate_release(c: Node2D) -> void:
 
 # ---------- Рисование (заглушки векторной графикой) ----------
 
+# --- Тема/скин: подхватывает картинки из res://assets/zen/, если они есть ---
+
+const THEME_DIR := "res://assets/zen/"
+
+func _load_theme() -> void:
+	theme = {
+		"stones": [],
+		"hand": _tex(THEME_DIR + "hand.png"),
+		"background": _tex(THEME_DIR + "background.png"),
+		"pedestal": _tex(THEME_DIR + "pedestal.png"),
+	}
+	for n in ["stone.png", "stone2.png", "stone3.png", "stone4.png"]:
+		var t := _tex(THEME_DIR + n)
+		if t:
+			theme["stones"].append(t)
+
+func _tex(path: String) -> Texture2D:
+	if ResourceLoader.exists(path):
+		return load(path)
+	return null
+
+func _pick_stone() -> int:
+	var stones_arr: Array = theme.get("stones", [])
+	if stones_arr.size() > 0:
+		return randi() % stones_arr.size()
+	return -1
+
+# Возвращает узел камня: спрайт из текстуры темы, либо векторную заглушку.
+func _stone_visual(size: Vector2, base: Color, idx: int) -> Node2D:
+	var stones_arr: Array = theme.get("stones", [])
+	if idx >= 0 and idx < stones_arr.size():
+		return _sprite_scaled_to_width(stones_arr[idx], size.x)
+	return _make_rock(size, base)
+
+func _sprite_scaled_to_width(tex: Texture2D, target_w: float) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	var s := target_w / float(maxi(1, tex.get_width()))
+	sp.scale = Vector2(s, s)
+	return sp
+
 func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 	var poly := _rock_polygon(size)
 	var p := Polygon2D.new()
@@ -358,6 +418,14 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 	return p
 
 func _add_hand_top(parent: Node, size: Vector2) -> void:
+	var hand_tex: Texture2D = theme.get("hand")
+	if hand_tex:
+		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.15)
+		var hand_h := hand_tex.get_height() * sp.scale.y
+		sp.position = Vector2(0, -size.y / 2.0 - hand_h / 2.0 + 16.0)
+		parent.add_child(sp)
+		return
+
 	var skin := Color("E8C49C")
 	var skin_d := Color("D8B488")
 	var hh := size.y / 2.0
