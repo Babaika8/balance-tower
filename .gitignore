@@ -2,7 +2,9 @@
 .godot/
 /android/
 /builds/
-export_presets.cfg
-
-# OS
+/build/
 .DS_Store
+
+# Node / Wrangler
+server/node_modules/
+.wrangler/

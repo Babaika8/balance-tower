@@ -266,8 +266,17 @@ func _game_over(at: Vector2) -> void:
 	if carrier:
 		carrier.queue_free()
 		carrier = null
+	_submit_score()
 	msg_label.text = "Башня упала!\nВысота: %d\n\nТап — заново" % score
 	msg_label.visible = true
+
+# Отправка рекорда на бэкенд (только в веб-сборке внутри Telegram).
+func _submit_score() -> void:
+	if score <= 0:
+		return
+	if not OS.has_feature("web"):
+		return
+	JavaScriptBridge.eval("window.BT_submitScore && window.BT_submitScore(%d)" % score, true)
 
 func _restart() -> void:
 	for s in stones:

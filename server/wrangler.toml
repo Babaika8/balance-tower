@@ -6,7 +6,7 @@ compatibility_date = "2026-06-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "balance_tower"
-database_id = "SET_AFTER_D1_CREATE"
+database_id = "4e0d4739-51a9-437e-b89d-c138d72dd972"
 
 # Разрешённый источник запросов (страница игры на GitHub Pages).
 [vars]
