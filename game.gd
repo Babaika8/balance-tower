@@ -61,6 +61,7 @@ func _setup_background() -> void:
 	if bg_tex:
 		var bg := TextureRect.new()
 		bg.texture = bg_tex
+		bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		layer.add_child(bg)
@@ -400,6 +401,7 @@ func _stone_visual(size: Vector2, base: Color, idx: int) -> Node2D:
 func _sprite_scaled_to_width(tex: Texture2D, target_w: float) -> Sprite2D:
 	var sp := Sprite2D.new()
 	sp.texture = tex
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var s := target_w / float(maxi(1, tex.get_width()))
 	sp.scale = Vector2(s, s)
 	return sp
