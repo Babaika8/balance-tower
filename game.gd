@@ -30,6 +30,7 @@ var carrier_dir: float = 1.0
 var current_stone: RigidBody2D = null
 var stones: Array[RigidBody2D] = []
 var loading_lb: bool = false
+var last_action_ms: int = 0
 
 var camera: Camera2D
 var score_label: Label
@@ -209,6 +210,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		act = true
 	if not act:
 		return
+	# Защита от двойного срабатывания (тач + эмулированный клик на одном тапе).
+	var now := Time.get_ticks_msec()
+	if now - last_action_ms < 200:
+		return
+	last_action_ms = now
 	if state == State.WAITING and carrier:
 		_drop()
 	elif state == State.GAME_OVER:
@@ -273,6 +279,7 @@ func _game_over(at: Vector2) -> void:
 	msg_label.visible = true
 	# Веб (Telegram): отправить счёт и подтянуть топ-10.
 	if OS.has_feature("web"):
+		msg_label.text = "Башня упала!\nВысота: %d\n\nЗагружаю рекорды…" % score
 		JavaScriptBridge.eval("window.BT_finish && window.BT_finish(%d)" % score, true)
 		loading_lb = true
 
