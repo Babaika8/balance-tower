@@ -29,6 +29,7 @@ var carrier: Node2D = null
 var carrier_dir: float = 1.0
 var current_stone: RigidBody2D = null
 var stones: Array[RigidBody2D] = []
+var loading_lb: bool = false
 
 var camera: Camera2D
 var score_label: Label
@@ -105,7 +106,7 @@ func _setup_ui() -> void:
 	msg_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	msg_label.add_theme_font_size_override("font_size", 44)
+	msg_label.add_theme_font_size_override("font_size", 30)
 	msg_label.add_theme_color_override("font_color", Color("7A2218"))
 	msg_label.visible = false
 	layer.add_child(msg_label)
@@ -163,6 +164,8 @@ func _spawn_carrier() -> void:
 	state = State.WAITING
 
 func _process(delta: float) -> void:
+	if loading_lb:
+		_poll_leaderboard()
 	if state == State.WAITING and carrier:
 		var x := carrier.position.x + carrier_dir * CARRIER_SPEED * delta
 		if x > BASE_W - MARGIN:
@@ -266,17 +269,35 @@ func _game_over(at: Vector2) -> void:
 	if carrier:
 		carrier.queue_free()
 		carrier = null
-	_submit_score()
-	msg_label.text = "Башня упала!\nВысота: %d\n\nТап — заново" % score
+	msg_label.text = _gameover_text("")
 	msg_label.visible = true
+	# Веб (Telegram): отправить счёт и подтянуть топ-10.
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("window.BT_finish && window.BT_finish(%d)" % score, true)
+		loading_lb = true
 
-# Отправка рекорда на бэкенд (только в веб-сборке внутри Telegram).
-func _submit_score() -> void:
-	if score <= 0:
+func _gameover_text(board: String) -> String:
+	var t := "Башня упала!\nВысота: %d\n" % score
+	if board != "":
+		t += "\n🏆 Топ:\n" + board
+	t += "\nТап — заново"
+	return t
+
+# Опрос результата лидерборда из JS (window.BT_lb заполняется асинхронно).
+func _poll_leaderboard() -> void:
+	var r = JavaScriptBridge.eval("window.BT_lb", true)
+	if typeof(r) != TYPE_STRING or r == "":
 		return
-	if not OS.has_feature("web"):
-		return
-	JavaScriptBridge.eval("window.BT_submitScore && window.BT_submitScore(%d)" % score, true)
+	loading_lb = false
+	var board := ""
+	var arr = JSON.parse_string(r)
+	if arr is Array:
+		var i := 1
+		for e in arr:
+			if e is Dictionary:
+				board += "%d. %s — %d\n" % [i, str(e.get("username", "?")), int(e.get("best_score", 0))]
+				i += 1
+	msg_label.text = _gameover_text(board)
 
 func _restart() -> void:
 	for s in stones:
@@ -288,6 +309,7 @@ func _restart() -> void:
 		carrier = null
 	current_stone = null
 	score = 0
+	loading_lb = false
 	top_y = ground_top_y
 	msg_label.visible = false
 	_update_score()
