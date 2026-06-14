@@ -1,0 +1,16 @@
+name = "balance-tower-api"
+main = "src/index.js"
+compatibility_date = "2026-06-01"
+
+# База данных рекордов (D1). database_id подставится после `wrangler d1 create`.
+[[d1_databases]]
+binding = "DB"
+database_name = "balance_tower"
+database_id = "SET_AFTER_D1_CREATE"
+
+# Разрешённый источник запросов (страница игры на GitHub Pages).
+[vars]
+ALLOWED_ORIGIN = "https://babaika8.github.io"
+
+# Секрет: токен бота. Кладётся отдельно командой:
+#   wrangler secret put BOT_TOKEN
