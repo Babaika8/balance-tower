@@ -95,6 +95,21 @@ const NEAR_SCALE := 0.62
 const FAR_ART_W := 2400.0   # ширина канваса дальнего слоя (для неба над ним)
 
 func _setup_background() -> void:
+	# Оригинальная сцена (EPS-референс) как фон. Режим COVER сам адаптирует под любой
+	# экран: на узком/портретном сужается по бокам, на широком показывает целиком.
+	var scene: Texture2D = theme.get("scene")
+	if scene:
+		var slayer := CanvasLayer.new()
+		slayer.layer = -10
+		add_child(slayer)
+		var srect := TextureRect.new()
+		srect.texture = scene
+		srect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		srect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		slayer.add_child(srect)
+		RenderingServer.set_default_clear_color(_top_color(scene))
+		return
+
 	var far: Texture2D = theme.get("far")
 	var mid: Texture2D = theme.get("mid")
 	var nl: Texture2D = theme.get("near_left")
@@ -583,6 +598,7 @@ func _load_theme() -> void:
 		"hand": _tex(THEME_DIR + "hand.svg"),
 		"hand_release": null,
 		"background": _tex(THEME_DIR + "background.svg"),
+		"scene": _tex(THEME_DIR + "scene.svg"),
 		"far": _tex(THEME_DIR + "far.svg"),
 		"mid": _tex(THEME_DIR + "mid.svg"),
 		"near_left": _tex(THEME_DIR + "near_left.svg"),
