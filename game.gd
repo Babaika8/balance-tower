@@ -38,6 +38,11 @@ var score_label: Label
 var msg_label: Label
 var dust: CPUParticles2D
 
+# Параллакс-слои фона: каждый {node, art_w, art_h, drift, bottom_y, sway}.
+# drift: 0 = закреплён в мире (едет быстрее всех), 1 = следует за камерой (почти неподвижен).
+var bg_layers: Array = []
+var start_cam_y: float = 0.0
+
 func _ready() -> void:
 	randomize()
 	_load_theme()
@@ -47,6 +52,8 @@ func _ready() -> void:
 	_setup_pedestal()
 	_setup_dust()
 	camera.position.y = top_y - 150.0
+	start_cam_y = camera.position.y
+	_update_parallax()
 	_spawn_carrier()
 	if OS.get_environment("BT_SHOT") != "":
 		_auto_shot()
@@ -80,37 +87,26 @@ func _auto_shot() -> void:
 
 # ---------- Сцена / окружение ----------
 
-func _setup_background() -> void:
-	var bg_tex: Texture2D = theme.get("background")
-	# Фон ~в один экран — крепим к экрану; высокий — пускаем в мир (едет вниз).
-	if bg_tex and bg_tex.get_height() < bg_tex.get_width() * 2.2:
-		var flayer := CanvasLayer.new()
-		flayer.layer = -10
-		add_child(flayer)
-		var frect := TextureRect.new()
-		frect.texture = bg_tex
-		frect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		frect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		flayer.add_child(frect)
-		RenderingServer.set_default_clear_color(_top_color(bg_tex))
-		return
+# far/mid рисуются на широком канвасе и держат ФИКСИРОВАННЫЙ масштаб — горизонт
+# стоит на месте при любом соотношении сторон (на широком экране открывается больше
+# по бокам). Передний план — отдельные деревья, приклеенные к краям вьюпорта.
+const SCENE_SCALE := 1.08
+const NEAR_SCALE := 0.62
+const FAR_ART_W := 2400.0   # ширина канваса дальнего слоя (для неба над ним)
 
-	# Высокий фон-картинка живёт в мире и едет вниз, пока камера поднимается.
-	if bg_tex:
-		var bg := Sprite2D.new()
-		bg.texture = bg_tex
-		bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		bg.z_index = -100
-		var s := BASE_W / float(bg_tex.get_width())
-		bg.scale = Vector2(s, s)
-		var bg_h := bg_tex.get_height() * s
-		# Низ фона — у нижней кромки стартового вида; вверх уходит небо.
-		var bottom_y := 1500.0
-		bg.position = Vector2(base_x, bottom_y - bg_h / 2.0)
-		add_child(bg)
-		# Цвет очистки = верхний пиксель фона (если башня перерастёт картинку).
-		RenderingServer.set_default_clear_color(_top_color(bg_tex))
-		_add_sky_life(bottom_y, bg_h)
+func _setup_background() -> void:
+	var far: Texture2D = theme.get("far")
+	var mid: Texture2D = theme.get("mid")
+	var nl: Texture2D = theme.get("near_left")
+	var nr: Texture2D = theme.get("near_right")
+	if far and mid and nl and nr:
+		# drift: 0.8 — дальний почти неподвижен; 0.08 — передний едет быстро.
+		_add_bg_layer(far, -100, 0.80, 1346.0, "center", SCENE_SCALE, false)
+		_add_bg_layer(mid, -90, 0.45, 1876.0, "center", SCENE_SCALE, false)
+		_add_bg_layer(nl, -80, 0.08, 1560.0, "edge_left", NEAR_SCALE, true)
+		_add_bg_layer(nr, -80, 0.08, 1560.0, "edge_right", NEAR_SCALE, true)
+		RenderingServer.set_default_clear_color(_top_color(far))
+		_add_sky_life()
 		return
 
 	var layer := CanvasLayer.new()
@@ -152,41 +148,154 @@ func _setup_background() -> void:
 	hills.color = Color(0.79, 0.55, 0.42, 0.45)
 	layer.add_child(hills)
 
-func _add_sky_life(bottom_y: float, bg_h: float) -> void:
-	var sky_top := bottom_y - bg_h
-	# Мерцающие звёзды в верхней (небесной) части фона.
-	for i in range(18):
-		var st := Polygon2D.new()
-		st.polygon = _circle_polygon(randf_range(2.0, 3.6), 8)
-		st.color = Color(1, 1, 1)
-		st.z_index = -90
-		st.position = Vector2(randf_range(50, BASE_W - 50), sky_top + randf_range(120, 1000))
-		st.modulate.a = randf_range(0.3, 1.0)
-		add_child(st)
-		var d := randf_range(0.7, 1.6)
+func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sp.z_index = z
+	sp.scale = Vector2(scale, scale)
+	sp.position = Vector2(base_x, bottom_y - tex.get_height() * scale / 2.0)
+	add_child(sp)
+	bg_layers.append({
+		"node": sp, "art_w": float(tex.get_width()), "art_h": float(tex.get_height()),
+		"drift": drift, "bottom_y": bottom_y, "mode": mode, "scale": scale,
+	})
+	if sway:
+		# Лёгкое покачивание деревьев «на ветру».
 		var tw := create_tween().set_loops()
-		tw.tween_property(st, "modulate:a", 0.25, d).set_trans(Tween.TRANS_SINE)
-		tw.tween_property(st, "modulate:a", 1.0, d).set_trans(Tween.TRANS_SINE)
-	# Плывущие облака в полосе заката.
-	for i in range(3):
+		tw.tween_property(sp, "rotation", 0.02, 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(sp, "rotation", -0.02, 4.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		tw.tween_property(sp, "rotation", 0.0, 2.4).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	return sp
+
+# Адаптив + параллакс. far/mid — фиксированный масштаб, по центру (горизонт стоит).
+# Деревья переднего плана приклеены к левому/правому краю вьюпорта: на телефоне
+# сходятся, на широком экране расходятся — кадр читается на любом устройстве.
+# По вертикали слои едут с разной скоростью (drift) при росте башни.
+func _update_parallax() -> void:
+	if bg_layers.is_empty() or camera == null:
+		return
+	var vw: float = get_viewport().get_visible_rect().size.x
+	var view_left: float = base_x - vw / 2.0
+	var view_right: float = base_x + vw / 2.0
+	for L in bg_layers:
+		var node: Sprite2D = L["node"]
+		var scale: float = L["scale"]
+		var sw: float = L["art_w"] * scale
+		var sh: float = L["art_h"] * scale
+		var world_bottom: float = L["bottom_y"] + (camera.position.y - start_cam_y) * L["drift"]
+		var x: float = base_x
+		match L["mode"]:
+			"edge_left":
+				x = view_left + sw / 2.0
+			"edge_right":
+				x = view_right - sw / 2.0
+		node.position = Vector2(x, world_bottom - sh / 2.0)
+
+# Небо над дальним планом: звёзды, облака, птица, дракон, воздушный шар.
+# Всё — дети дальнего слоя (в его арт-координатах), чтобы двигаться как дальний план.
+func _add_sky_life() -> void:
+	if bg_layers.is_empty():
+		return
+	var far: Sprite2D = bg_layers[0]["node"]
+	# Звёзды/блики в верхнем небе (арт y < 240, над солнцем).
+	for i in range(16):
+		var st := Polygon2D.new()
+		st.polygon = _circle_polygon(randf_range(2.5, 4.5), 8)
+		st.color = Color(1, 1, 1)
+		st.position = Vector2(randf_range(40, FAR_ART_W - 40), randf_range(-1200, 180))
+		st.modulate.a = randf_range(0.3, 0.9)
+		far.add_child(st)
+		var d := randf_range(0.8, 1.8)
+		var tw := create_tween().set_loops()
+		tw.tween_property(st, "modulate:a", 0.2, d).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(st, "modulate:a", 0.9, d).set_trans(Tween.TRANS_SINE)
+	# Плывущие облака.
+	for i in range(5):
 		var cl := _make_cloud()
-		cl.z_index = -92
-		cl.position = Vector2(randf_range(0, BASE_W), sky_top + randf_range(380, 820))
-		add_child(cl)
-		var dur := randf_range(26.0, 42.0)
-		var tw2 := create_tween().set_loops()
-		tw2.tween_property(cl, "position:x", BASE_W + 260.0, dur)
-		tw2.tween_callback(func() -> void: cl.position.x = -260.0)
+		cl.position = Vector2(randf_range(0, FAR_ART_W), randf_range(-1100, 220))
+		far.add_child(cl)
+		_drift_across(cl, randf_range(34.0, 60.0))
+	# Птица, воздушный шар, дракон — по одному, в разных высотах неба.
+	var bird := _make_bird()
+	bird.position = Vector2(randf_range(200, 900), randf_range(-300, 60))
+	far.add_child(bird)
+	_drift_across(bird, 26.0)
+	var balloon := _make_balloon()
+	balloon.position = Vector2(randf_range(150, 1000), randf_range(-900, -300))
+	far.add_child(balloon)
+	_drift_across(balloon, 70.0)
+	var dragon := _make_dragon()
+	dragon.position = Vector2(randf_range(200, 900), randf_range(-1500, -800))
+	far.add_child(dragon)
+	_drift_across(dragon, 48.0)
+
+func _drift_across(n: Node2D, dur: float) -> void:
+	var tw := create_tween().set_loops()
+	tw.tween_property(n, "position:x", FAR_ART_W + 220.0, dur)
+	tw.tween_callback(func() -> void: n.position.x = -220.0)
 
 func _make_cloud() -> Node2D:
 	var n := Node2D.new()
-	var col := Color(1, 1, 1, 0.13)
+	var col := Color(1, 1, 1, 0.16)
 	for p in [[0.0, 0.0, 72.0, 26.0], [52.0, 8.0, 56.0, 22.0], [-48.0, 10.0, 50.0, 20.0], [16.0, -14.0, 48.0, 22.0]]:
 		var e := Polygon2D.new()
 		e.polygon = _ellipse_polygon(p[2], p[3], 18)
 		e.color = col
 		e.position = Vector2(p[0], p[1])
 		n.add_child(e)
+	return n
+
+func _make_bird() -> Node2D:
+	# Простой силуэт «галочкой» с лёгким взмахом крыльев.
+	var n := Node2D.new()
+	var w := Polygon2D.new()
+	w.polygon = PackedVector2Array([Vector2(-20, 0), Vector2(0, -7), Vector2(20, 0), Vector2(0, -2)])
+	w.color = Color(0.16, 0.14, 0.22, 0.85)
+	n.add_child(w)
+	var tw := create_tween().set_loops()
+	tw.tween_property(w, "scale", Vector2(1.0, 0.5), 0.4).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(w, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
+	return n
+
+func _make_balloon() -> Node2D:
+	var n := Node2D.new()
+	var env := Polygon2D.new()
+	env.polygon = _ellipse_polygon(30, 38, 22)
+	env.color = Color("E07A6E")
+	n.add_child(env)
+	var stripe := Polygon2D.new()
+	stripe.polygon = _ellipse_polygon(8, 36, 16)
+	stripe.color = Color("F0B59A")
+	n.add_child(stripe)
+	var basket := Polygon2D.new()
+	basket.polygon = PackedVector2Array([Vector2(-7, 44), Vector2(7, 44), Vector2(5, 56), Vector2(-5, 56)])
+	basket.color = Color("4A3326")
+	n.add_child(basket)
+	# Лёгкое покачивание.
+	var tw := create_tween().set_loops()
+	tw.tween_property(n, "rotation", 0.06, 2.2).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(n, "rotation", -0.06, 2.2).set_trans(Tween.TRANS_SINE)
+	return n
+
+func _make_dragon() -> Node2D:
+	# Стилизованный восточный дракон: волнистое тело сегментами + голова.
+	var n := Node2D.new()
+	var col := Color("C8324E")
+	for i in range(7):
+		var seg := Polygon2D.new()
+		seg.polygon = _circle_polygon(11.0 - i * 0.9, 14)
+		seg.color = col
+		seg.position = Vector2(-i * 22.0, sin(i * 0.9) * 14.0)
+		n.add_child(seg)
+	var head := Polygon2D.new()
+	head.polygon = PackedVector2Array([Vector2(22, -10), Vector2(40, 0), Vector2(22, 10), Vector2(14, 0)])
+	head.color = col
+	n.add_child(head)
+	# Волнообразное «дыхание» тела.
+	var tw := create_tween().set_loops()
+	tw.tween_property(n, "position:y", n.position.y - 10.0, 1.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(n, "position:y", n.position.y, 1.6).set_trans(Tween.TRANS_SINE)
 	return n
 
 func _setup_camera() -> void:
@@ -289,6 +398,7 @@ func _process(delta: float) -> void:
 	if camera:
 		var target_y := top_y - 150.0
 		camera.position.y = lerp(camera.position.y, target_y, clamp(delta * 3.0, 0.0, 1.0))
+	_update_parallax()
 
 func _physics_process(_delta: float) -> void:
 	if state == State.GAME_OVER:
@@ -473,6 +583,10 @@ func _load_theme() -> void:
 		"hand": _tex(THEME_DIR + "hand.svg"),
 		"hand_release": null,
 		"background": _tex(THEME_DIR + "background.svg"),
+		"far": _tex(THEME_DIR + "far.svg"),
+		"mid": _tex(THEME_DIR + "mid.svg"),
+		"near_left": _tex(THEME_DIR + "near_left.svg"),
+		"near_right": _tex(THEME_DIR + "near_right.svg"),
 		"pedestal": _tex(THEME_DIR + "pedestal.svg"),
 	}
 	for n in ["stone.svg", "stone2.svg", "stone3.svg", "stone4.svg"]:
@@ -535,12 +649,13 @@ func _add_hand_top(parent: Node, size: Vector2) -> void:
 	if hand_tex:
 		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.1)
 		# В hand.svg кончики пальцев ~ y=185 при центре viewBox 105 → +80 от центра.
-		sp.position = Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 14.0)
+		sp.position = Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 40.0)
 		parent.add_child(sp)
 		parent.set_meta("hand_node", sp)
 		# Лёгкое «дыхание» руки, пока держит камень.
+		# Tween привязан к спрайту — гибнет вместе с рукой при броске (без варнингов).
 		var by := sp.position.y
-		var bt := create_tween().set_loops()
+		var bt := sp.create_tween().set_loops()
 		bt.tween_property(sp, "position:y", by - 6.0, 0.9).set_trans(Tween.TRANS_SINE)
 		bt.tween_property(sp, "position:y", by, 0.9).set_trans(Tween.TRANS_SINE)
 		return
