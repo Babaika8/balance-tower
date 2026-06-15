@@ -43,17 +43,18 @@ var dust: CPUParticles2D
 var bg_layers: Array = []
 var start_cam_y: float = 0.0
 
-# Атмосфера по высоте (режим без арта): меняющееся небо/солнце/звёзды/холмы.
+# Атмосфера по высоте (режим без арта): меняющееся небо/солнце/звёзды/дюны/облака/сакуры.
+# Фон экранно-закреплён, но центрируется по центру вьюпорта (как камера) и тянется
+# на всю ширину — поэтому раскладку обновляем каждый кадр по реальному размеру экрана.
 var atmo_active: bool = false
 var sky_grad: Gradient
 var sun_node: Polygon2D
 var halo_node: Polygon2D
-var stars_root: Node2D
-var hill_far: Polygon2D
-var hill_near: Polygon2D
-var hill_far_y: float = 0.0
-var hill_near_y: float = 0.0
 var motes: CPUParticles2D
+var atmo_stars: Array = []   # {node, nx, ny}
+var atmo_dunes: Array = []   # {node, base_y, factor, shade}
+var atmo_clouds: Array = []  # {node, nx, speed, ny}
+var atmo_sakura: Array = []  # {node, nx, base_y, canopy:[Polygon2D]}
 
 func _ready() -> void:
 	randomize()
@@ -163,50 +164,62 @@ func _setup_background() -> void:
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(sky)
 
-	# Звёзды (видны ночью — управляем общей прозрачностью).
-	stars_root = Node2D.new()
-	layer.add_child(stars_root)
-	for i in range(26):
+	# Звёзды (видны ночью). Хранят нормированный x (0..1) — раскладка под ширину экрана.
+	for i in range(30):
 		var st := Polygon2D.new()
 		st.polygon = _circle_polygon(randf_range(1.6, 3.2), 7)
 		st.color = Color(1, 1, 1)
-		st.position = Vector2(randf_range(20, BASE_W - 20), randf_range(20, BASE_H * 0.6))
-		stars_root.add_child(st)
+		layer.add_child(st)
 		var d := randf_range(0.7, 1.7)
 		var tw := st.create_tween().set_loops()
 		tw.tween_property(st, "modulate:a", 0.25, d).set_trans(Tween.TRANS_SINE)
 		tw.tween_property(st, "modulate:a", 1.0, d).set_trans(Tween.TRANS_SINE)
-	stars_root.modulate.a = 0.0
+		atmo_stars.append({"node": st, "nx": randf(), "ny": randf_range(20, BASE_H * 0.55)})
 
 	halo_node = Polygon2D.new()
 	halo_node.polygon = _circle_polygon(150.0, 28)
 	halo_node.color = Color(0.99, 0.93, 0.81, 0.35)
-	halo_node.position = Vector2(520, 200)
 	layer.add_child(halo_node)
 	sun_node = Polygon2D.new()
 	sun_node.polygon = _circle_polygon(70.0, 28)
 	sun_node.color = Color("FCEBCF")
-	sun_node.position = Vector2(520, 200)
 	layer.add_child(sun_node)
 
-	# Два слоя холмов (дальний/ближний) для параллакса при подъёме.
-	hill_far = _make_hill([Vector2(-80, 880), Vector2(220, 840), Vector2(470, 870),
-			Vector2(700, 835), Vector2(BASE_W + 80, 865)], Color(0.83, 0.62, 0.48))
-	layer.add_child(hill_far)
-	hill_near = _make_hill([Vector2(-80, 940), Vector2(180, 900), Vector2(380, 930),
-			Vector2(560, 895), Vector2(BASE_W + 80, 925)], Color(0.74, 0.50, 0.38))
-	layer.add_child(hill_near)
-	hill_far_y = hill_far.position.y
-	hill_near_y = hill_near.position.y
+	# Облака (плывут по небу, тинт под фазу).
+	for i in range(5):
+		var cl := _make_cloud()
+		cl.scale = Vector2(randf_range(1.0, 1.8), randf_range(1.0, 1.8))
+		layer.add_child(cl)
+		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.006, 0.014),
+				"ny": randf_range(120, 480)})
+
+	# Сакуры на заднем плане (за дюнами): тёмный ствол + розовые соцветия.
+	for i in range(6):
+		var sk := _make_sakura(randf_range(0.9, 1.4))
+		layer.add_child(sk["node"])
+		sk["nx"] = randf()
+		sk["base_y"] = randf_range(770, 840)
+		atmo_sakura.append(sk)
+
+	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), параллакс по высоте.
+	# base_y — мировой уровень гребня; factor — скорость параллакса; shade — затемнение.
+	var dune_specs := [
+		[760.0, 36.0, 0.02, 0.00], [840.0, 52.0, 0.035, 0.10],
+		[930.0, 50.0, 0.05, 0.20], [1040.0, 46.0, 0.07, 0.30],
+	]
+	for i in range(dune_specs.size()):
+		var sp: Array = dune_specs[i]
+		var dn := _make_dune(sp[1], 7 + i, i * 13 + 3)
+		layer.add_child(dn)
+		atmo_dunes.append({"node": dn, "base_y": sp[0], "factor": sp[2], "shade": sp[3]})
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
-	motes.amount = 22
+	motes.amount = 26
 	motes.lifetime = 7.0
 	motes.preprocess = 4.0
-	motes.position = Vector2(BASE_W / 2.0, BASE_H + 20)
 	motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
-	motes.emission_rect_extents = Vector2(BASE_W / 2.0, 10)
+	motes.emission_rect_extents = Vector2(BASE_W, 10)
 	motes.direction = Vector2(0, -1)
 	motes.spread = 18.0
 	motes.gravity = Vector2(8, -16)
@@ -220,14 +233,47 @@ func _setup_background() -> void:
 	atmo_active = true
 	_update_atmosphere()
 
-func _make_hill(pts: Array, col: Color) -> Polygon2D:
-	var poly := PackedVector2Array(pts)
-	poly.append(Vector2(BASE_W + 80, BASE_H + 200))
-	poly.append(Vector2(-80, BASE_H + 200))
-	var h := Polygon2D.new()
-	h.polygon = poly
-	h.color = col
-	return h
+# Дюна: волнистый гребень вокруг y=0 (range -amp..0), залив до низа. Центрируется
+# по экрану через node.position в раскладке; ширина с запасом на любой экран.
+func _make_dune(amp: float, step_seed: int, seed: int) -> Polygon2D:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	var ph := rng.randf() * TAU
+	var pts := PackedVector2Array()
+	var x := -3200.0
+	while x <= 3200.0:
+		var y := -amp * 0.5 * (1.0 + sin(x * 0.0016 + ph)) - rng.randf() * amp * 0.35
+		pts.append(Vector2(x, y))
+		x += 70.0
+	pts.append(Vector2(3200.0, 2600.0))
+	pts.append(Vector2(-3200.0, 2600.0))
+	var p := Polygon2D.new()
+	p.polygon = pts
+	return p
+
+func _make_sakura(scale: float) -> Dictionary:
+	var n := Node2D.new()
+	n.scale = Vector2(scale, scale)
+	# ствол с парой веток
+	var trunk := Polygon2D.new()
+	trunk.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(4, -70), Vector2(-4, -70)])
+	trunk.color = Color("3A2A2E")
+	n.add_child(trunk)
+	for bx in [-1, 1]:
+		var br := Polygon2D.new()
+		br.polygon = PackedVector2Array([Vector2(0, -50), Vector2(6 * bx, -52), Vector2(30 * bx, -96), Vector2(22 * bx, -96)])
+		br.color = Color("3A2A2E")
+		n.add_child(br)
+	# крона — кластеры розовых кругов
+	var canopy: Array = []
+	for c in [[0, -104, 40], [-32, -92, 30], [34, -94, 30], [-12, -126, 28], [18, -122, 26]]:
+		var bl := Polygon2D.new()
+		bl.polygon = _circle_polygon(float(c[2]), 16)
+		bl.position = Vector2(c[0], c[1])
+		bl.color = Color("F1C7E4")
+		n.add_child(bl)
+		canopy.append(bl)
+	return {"node": n, "canopy": canopy, "nx": 0.0, "base_y": 800.0}
 
 # Палитра атмосферы по фазам (порог по счёту): рассвет→день→закат→ночь.
 # Каждая фаза: [score, top, mid, bot, sun, sun_y, ground, star_a]
@@ -261,15 +307,53 @@ func _update_atmosphere() -> void:
 	halo_node.position.y = sun_node.position.y
 	halo_node.color = Color(suncol.r, suncol.g, suncol.b, 0.30)
 	var ground: Color = a[6].lerp(b[6], f)
-	hill_far.color = ground
-	hill_near.color = ground.darkened(0.18)
-	stars_root.modulate.a = lerp(float(a[7]), float(b[7]), f)
+	var star_a: float = lerp(float(a[7]), float(b[7]), f)
+	var night: float = star_a   # 0 днём, 1 ночью
 	motes.color = Color(suncol.r, suncol.g, suncol.b, 0.16)
-	# Параллакс холмов при подъёме камеры.
+
+	# --- Респонсивная раскладка: центр по центру вьюпорта, ширина — вся видимая ---
+	var vr: Vector2 = get_viewport().get_visible_rect().size
+	var vw: float = vr.x
+	var vh: float = vr.y
+	var cx: float = vw / 2.0
+	var dt: float = get_process_delta_time()
+	var climb: float = 0.0
 	if camera:
-		var climb: float = start_cam_y - camera.position.y
-		hill_far.position.y = hill_far_y + climb * 0.04
-		hill_near.position.y = hill_near_y + climb * 0.08
+		climb = start_cam_y - camera.position.y
+
+	# Солнце/гало — справа-сверху относительно центра экрана.
+	var sun_x: float = cx + vw * 0.18
+	sun_node.position = Vector2(sun_x, lerp(float(a[5]), float(b[5]), f))
+	halo_node.position = sun_node.position
+
+	# Звёзды по всей ширине.
+	for s in atmo_stars:
+		var sn: Polygon2D = s["node"]
+		sn.position = Vector2(s["nx"] * vw, s["ny"])
+		sn.self_modulate.a = star_a
+
+	# Облака плывут, тинт под фазу (днём светлее, ночью почти прячутся).
+	for c in atmo_clouds:
+		c["nx"] = fmod(c["nx"] + c["speed"] * dt + 1.1, 1.2)
+		var cn: Node2D = c["node"]
+		cn.position = Vector2((c["nx"] - 0.1) * vw, c["ny"])
+		cn.modulate = Color(suncol.r, suncol.g, suncol.b, lerp(0.5, 0.12, night))
+
+	# Дюны: центр по экрану, цвет от фазы (дальше — светлее, ближе — темнее), параллакс.
+	for d in atmo_dunes:
+		var dn: Polygon2D = d["node"]
+		dn.color = ground.darkened(d["shade"])
+		dn.position = Vector2(cx, d["base_y"] + climb * d["factor"])
+
+	# Сакуры за дюнами: по всей ширине, крона тускнеет к ночи.
+	for sk in atmo_sakura:
+		var skn: Node2D = sk["node"]
+		skn.position = Vector2(sk["nx"] * vw, sk["base_y"] + climb * 0.045)
+		skn.modulate = Color(1, 1, 1).lerp(Color(0.45, 0.45, 0.6), night * 0.85)
+
+	# Частицы — на всю ширину у нижней кромки.
+	motes.position = Vector2(cx, vh + 20.0)
+	motes.emission_rect_extents = Vector2(maxf(BASE_W, vw) / 2.0, 10.0)
 
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
@@ -792,29 +876,7 @@ func _add_hand_top(parent: Node, size: Vector2) -> void:
 		bt.tween_property(sp, "position:y", by - 6.0, 0.9).set_trans(Tween.TRANS_SINE)
 		bt.tween_property(sp, "position:y", by, 0.9).set_trans(Tween.TRANS_SINE)
 		return
-
-	var skin := Color("E8C49C")
-	var skin_d := Color("D8B488")
-	var hh := size.y / 2.0
-	# Тыльная сторона ладони над камнем.
-	var back := Polygon2D.new()
-	back.polygon = _ellipse_polygon(46, 28, 20)
-	back.color = skin
-	back.position = Vector2(6, -hh - 30)
-	parent.add_child(back)
-	# Большой палец справа.
-	var thumb := Polygon2D.new()
-	thumb.polygon = _ellipse_polygon(12, 20, 14)
-	thumb.color = skin_d
-	thumb.position = Vector2(size.x * 0.42, -hh + 6)
-	parent.add_child(thumb)
-	# Пальцы, обхватывающие камень сверху.
-	for x in [-size.x * 0.30, -size.x * 0.08, size.x * 0.14]:
-		var f := Polygon2D.new()
-		f.polygon = _ellipse_polygon(11, 18, 14)
-		f.color = skin
-		f.position = Vector2(x, -hh + 2)
-		parent.add_child(f)
+	# Без арт-руки: ничего не рисуем — камень «несётся» сам (рука убрана по просьбе).
 
 func _rock_polygon(size: Vector2) -> PackedVector2Array:
 	var hw := size.x / 2.0
