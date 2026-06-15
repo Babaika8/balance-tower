@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c786tsb50n12s"
-path="res://.godot/imported/stone2.png-d94ad81059afb273a4f839b8f25a68e1.ctex"
+uid="uid://dx7sou45fiio1"
+path="res://.godot/imported/hand2.png-ab1404a1740a6df3808a94123c1657c1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/zen/stone2.png"
-dest_files=["res://.godot/imported/stone2.png-d94ad81059afb273a4f839b8f25a68e1.ctex"]
+source_file="res://assets/zen/hand2.png"
+dest_files=["res://.godot/imported/hand2.png-ab1404a1740a6df3808a94123c1657c1.ctex"]
 
 [params]
 

@@ -5,7 +5,7 @@ extends Node2D
 # кривая укладка кренит башню, сильный перекос её роняет. Следующий камень
 # появляется сразу при касании — не ждём, пока башня перестанет качаться.
 
-const STONE_SIZE := Vector2(170, 56)
+var ssize: Vector2 = Vector2(180, 56)
 const CARRIER_GAP := 175.0      # на сколько выше вершины висит рука с камнем
 const MARGIN := 90.0            # отступ движения руки от краёв базовой ширины
 const CARRIER_SPEED := 330.0    # скорость руки, px/сек
@@ -48,24 +48,49 @@ func _ready() -> void:
 	_setup_dust()
 	camera.position.y = top_y - 150.0
 	_spawn_carrier()
+	if OS.get_environment("BT_SHOT") != "":
+		_auto_shot()
+
+func _auto_shot() -> void:
+	await get_tree().create_timer(0.5).timeout
+	for i in range(5):
+		var tries := 0
+		while tries < 200 and (carrier == null or state != State.WAITING
+				or absf(carrier.position.x - base_x) > 8.0):
+			await get_tree().process_frame
+			tries += 1
+		if state == State.WAITING and carrier:
+			_drop()
+		await get_tree().create_timer(0.9).timeout
+	await get_tree().create_timer(0.6).timeout
+	var img := get_viewport().get_texture().get_image()
+	img.save_png("/tmp/bt_shot.png")
+	get_tree().quit()
 
 # ---------- Сцена / окружение ----------
 
 func _setup_background() -> void:
+	# Высокий фон-картинка живёт в мире и едет вниз, пока камера поднимается.
+	var bg_tex: Texture2D = theme.get("background")
+	if bg_tex:
+		var bg := Sprite2D.new()
+		bg.texture = bg_tex
+		bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		bg.z_index = -100
+		var s := BASE_W / float(bg_tex.get_width())
+		bg.scale = Vector2(s, s)
+		var bg_h := bg_tex.get_height() * s
+		# Низ фона — у нижней кромки стартового вида; вверх уходит небо.
+		var bottom_y := 1500.0
+		bg.position = Vector2(base_x, bottom_y - bg_h / 2.0)
+		add_child(bg)
+		# Цвет очистки = верхний пиксель фона (если башня перерастёт картинку).
+		RenderingServer.set_default_clear_color(_top_color(bg_tex))
+		return
+
 	var layer := CanvasLayer.new()
 	layer.layer = -10
 	add_child(layer)
-
-	# Если у темы есть картинка фона — используем её вместо векторного неба.
-	var bg_tex: Texture2D = theme.get("background")
-	if bg_tex:
-		var bg := TextureRect.new()
-		bg.texture = bg_tex
-		bg.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		bg.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		layer.add_child(bg)
-		return
 
 	var g := Gradient.new()
 	g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
@@ -132,19 +157,23 @@ func _setup_pedestal() -> void:
 	ped.position = Vector2(base_x, pedestal_y)
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(STONE_SIZE.x, 60.0)
+	rect.size = Vector2(ssize.x, 60.0)
 	shape.shape = rect
 	ped.add_child(shape)
-	var shadow := Polygon2D.new()
-	shadow.polygon = _ellipse_polygon(STONE_SIZE.x * 0.72, 18.0, 24)
-	shadow.color = Color(0.3, 0.18, 0.12, 0.32)
-	shadow.position = Vector2(0, 40)
-	ped.add_child(shadow)
 	var ped_tex: Texture2D = theme.get("pedestal")
+	var stones_arr: Array = theme.get("stones", [])
 	if ped_tex:
-		ped.add_child(_sprite_scaled_to_width(ped_tex, STONE_SIZE.x))
+		ped.add_child(_sprite_scaled_to_width(ped_tex, ssize.x))
+	elif stones_arr.size() > 0:
+		# Нет отдельного постамента — кладём камень как основание.
+		ped.add_child(_sprite_scaled_to_width(stones_arr[0], ssize.x))
 	else:
-		ped.add_child(_make_rock(Vector2(STONE_SIZE.x, 60.0), Color("6E635C")))
+		var shadow := Polygon2D.new()
+		shadow.polygon = _ellipse_polygon(ssize.x * 0.72, 18.0, 24)
+		shadow.color = Color(0.3, 0.18, 0.12, 0.32)
+		shadow.position = Vector2(0, 40)
+		ped.add_child(shadow)
+		ped.add_child(_make_rock(Vector2(ssize.x, 60.0), Color("6E635C")))
 	add_child(ped)
 	ground_top_y = pedestal_y - 30.0
 	top_y = ground_top_y
@@ -175,10 +204,10 @@ func _spawn_carrier() -> void:
 	var idx := _pick_stone()
 	carrier.set_meta("stone_color", color)
 	carrier.set_meta("stone_idx", idx)
-	var rock := _stone_visual(STONE_SIZE, color, idx)
+	var rock := _stone_visual(ssize, color, idx)
 	carrier.add_child(rock)
 	carrier.set_meta("rock_node", rock)
-	_add_hand_top(carrier, STONE_SIZE)
+	_add_hand_top(carrier, ssize)
 	add_child(carrier)
 	carrier_dir = 1.0
 	state = State.WAITING
@@ -254,10 +283,10 @@ func _drop() -> void:
 	stone.max_contacts_reported = 4
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = STONE_SIZE
+	rect.size = ssize
 	shape.shape = rect
 	stone.add_child(shape)
-	stone.add_child(_stone_visual(STONE_SIZE, color, idx))
+	stone.add_child(_stone_visual(ssize, color, idx))
 	var mat := PhysicsMaterial.new()
 	mat.friction = 0.9
 	mat.bounce = 0.0
@@ -278,12 +307,12 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 		return
 	stone.set_meta("placed", true)
 	stone.set_meta("min_y", stone.global_position.y)
-	var new_top := stone.global_position.y - STONE_SIZE.y / 2.0
+	var new_top := stone.global_position.y - ssize.y / 2.0
 	if new_top < top_y:
 		top_y = new_top
 	score += 1
 	_update_score()
-	_puff(Vector2(stone.global_position.x, stone.global_position.y + STONE_SIZE.y / 2.0))
+	_puff(Vector2(stone.global_position.x, stone.global_position.y + ssize.y / 2.0))
 	if stone == current_stone:
 		current_stone = null
 	# Рука появляется сразу — даже пока башня ещё качается.
@@ -355,6 +384,12 @@ func _animate_release(c: Node2D) -> void:
 	var rock = c.get_meta("rock_node")
 	if is_instance_valid(rock):
 		rock.queue_free()
+	# Кадр «отпустил» (вторая картинка руки).
+	var hand_rel: Texture2D = theme.get("hand_release")
+	if hand_rel and c.has_meta("hand_node"):
+		var hn = c.get_meta("hand_node")
+		if is_instance_valid(hn):
+			hn.texture = hand_rel
 	var tw := create_tween()
 	tw.set_parallel(true)
 	tw.tween_property(c, "position:y", c.position.y - 70.0, 0.22)
@@ -371,19 +406,33 @@ const THEME_DIR := "res://assets/zen/"
 func _load_theme() -> void:
 	theme = {
 		"stones": [],
-		"hand": _tex(THEME_DIR + "hand.png"),
+		"hand": _tex(THEME_DIR + "hand1.png"),       # кадр «держит»
+		"hand_release": _tex(THEME_DIR + "hand2.png"),  # кадр «отпустил»
 		"background": _tex(THEME_DIR + "background.png"),
 		"pedestal": _tex(THEME_DIR + "pedestal.png"),
 	}
+	if theme["hand"] == null:
+		theme["hand"] = _tex(THEME_DIR + "hand.png")
 	for n in ["stone.png", "stone2.png", "stone3.png", "stone4.png"]:
 		var t := _tex(THEME_DIR + n)
 		if t:
 			theme["stones"].append(t)
+	# Подгоняем физическую коробку камня под пропорции арта (ширина 180).
+	var arr: Array = theme["stones"]
+	if arr.size() > 0:
+		var t0: Texture2D = arr[0]
+		ssize = Vector2(180.0, round(180.0 * t0.get_height() / float(t0.get_width())))
 
 func _tex(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
 		return load(path)
 	return null
+
+func _top_color(tex: Texture2D) -> Color:
+	var img := tex.get_image()
+	if img:
+		return img.get_pixel(int(img.get_width() / 2), 1)
+	return Color(0.1, 0.08, 0.15)
 
 func _pick_stone() -> int:
 	var stones_arr: Array = theme.get("stones", [])
@@ -422,10 +471,12 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 func _add_hand_top(parent: Node, size: Vector2) -> void:
 	var hand_tex: Texture2D = theme.get("hand")
 	if hand_tex:
-		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.15)
+		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.9)
 		var hand_h := hand_tex.get_height() * sp.scale.y
-		sp.position = Vector2(0, -size.y / 2.0 - hand_h / 2.0 + 16.0)
+		# Кисть держит камень: опускаем так, чтобы пальцы были у верха камня.
+		sp.position = Vector2(0, -size.y / 2.0 - hand_h / 2.0 + 90.0)
 		parent.add_child(sp)
+		parent.set_meta("hand_node", sp)
 		return
 
 	var skin := Color("E8C49C")
