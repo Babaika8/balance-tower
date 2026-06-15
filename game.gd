@@ -52,6 +52,17 @@ func _ready() -> void:
 		_auto_shot()
 
 func _auto_shot() -> void:
+	if OS.get_environment("BT_SHOT") == "hold":
+		# Снимок без бросков: видно, как рука держит камень. Останавливаем носитель.
+		await get_tree().process_frame
+		carrier_dir = 0.0
+		if carrier:
+			carrier.position.x = base_x
+		await get_tree().create_timer(0.5).timeout
+		var im0 := get_viewport().get_texture().get_image()
+		im0.save_png("/tmp/bt_shot.png")
+		get_tree().quit()
+		return
 	await get_tree().create_timer(0.5).timeout
 	for i in range(5):
 		var tries := 0
@@ -473,8 +484,9 @@ func _add_hand_top(parent: Node, size: Vector2) -> void:
 	if hand_tex:
 		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.9)
 		var hand_h := hand_tex.get_height() * sp.scale.y
-		# Кисть держит камень: опускаем так, чтобы пальцы были у верха камня.
-		sp.position = Vector2(0, -size.y / 2.0 - hand_h / 2.0 + 90.0)
+		# Точка хвата (между пальцами и большим) смещена от центра картинки —
+		# сдвигаем спрайт так, чтобы хват пришёлся ровно на камень.
+		sp.position = Vector2(10.0, -size.y / 2.0 - hand_h / 2.0 + 250.0)
 		parent.add_child(sp)
 		parent.set_meta("hand_node", sp)
 		return
