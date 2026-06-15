@@ -43,6 +43,18 @@ var dust: CPUParticles2D
 var bg_layers: Array = []
 var start_cam_y: float = 0.0
 
+# Атмосфера по высоте (режим без арта): меняющееся небо/солнце/звёзды/холмы.
+var atmo_active: bool = false
+var sky_grad: Gradient
+var sun_node: Polygon2D
+var halo_node: Polygon2D
+var stars_root: Node2D
+var hill_far: Polygon2D
+var hill_near: Polygon2D
+var hill_far_y: float = 0.0
+var hill_near_y: float = 0.0
+var motes: CPUParticles2D
+
 func _ready() -> void:
 	randomize()
 	_load_theme()
@@ -65,6 +77,11 @@ func _auto_shot() -> void:
 		carrier_dir = 0.0
 		if carrier:
 			carrier.position.x = base_x
+		# Дебаг: BT_SCORE=N — выставить высоту для превью фазы атмосферы.
+		if OS.get_environment("BT_SCORE") != "":
+			score = int(OS.get_environment("BT_SCORE"))
+			_atmo_p = float(score)
+			_update_score()
 		await get_tree().create_timer(0.5).timeout
 		var im0 := get_viewport().get_texture().get_image()
 		im0.save_png("/tmp/bt_shot.png")
@@ -124,18 +141,21 @@ func _setup_background() -> void:
 		_add_sky_life()
 		return
 
+	# «Тёплый рассвет» + атмосфера по высоте: небо меняет цвет рассвет→день→закат→ночь
+	# по мере роста башни, восходит/заходит солнце (→луна), проступают звёзды,
+	# холмы едут с параллаксом. Всё кодом, экранно-закреплено (фон далёкий).
 	var layer := CanvasLayer.new()
 	layer.layer = -10
 	add_child(layer)
 
-	var g := Gradient.new()
-	g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
-	g.colors = PackedColorArray([Color("F8D9A0"), Color("F2B97E"), Color("E89B79")])
+	sky_grad = Gradient.new()
+	sky_grad.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	sky_grad.colors = PackedColorArray([Color("F8D9A0"), Color("F2B97E"), Color("E89B79")])
 	var tex := GradientTexture2D.new()
-	tex.gradient = g
+	tex.gradient = sky_grad
 	tex.fill_from = Vector2(0, 0)
 	tex.fill_to = Vector2(0, 1)
-	tex.width = int(BASE_W)
+	tex.width = 8
 	tex.height = int(BASE_H)
 	var sky := TextureRect.new()
 	sky.texture = tex
@@ -143,25 +163,113 @@ func _setup_background() -> void:
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(sky)
 
-	var halo := Polygon2D.new()
-	halo.polygon = _circle_polygon(150.0, 28)
-	halo.color = Color(0.99, 0.93, 0.81, 0.35)
-	halo.position = Vector2(520, 200)
-	layer.add_child(halo)
-	var sun := Polygon2D.new()
-	sun.polygon = _circle_polygon(70.0, 28)
-	sun.color = Color("FCEBCF")
-	sun.position = Vector2(520, 200)
-	layer.add_child(sun)
+	# Звёзды (видны ночью — управляем общей прозрачностью).
+	stars_root = Node2D.new()
+	layer.add_child(stars_root)
+	for i in range(26):
+		var st := Polygon2D.new()
+		st.polygon = _circle_polygon(randf_range(1.6, 3.2), 7)
+		st.color = Color(1, 1, 1)
+		st.position = Vector2(randf_range(20, BASE_W - 20), randf_range(20, BASE_H * 0.6))
+		stars_root.add_child(st)
+		var d := randf_range(0.7, 1.7)
+		var tw := st.create_tween().set_loops()
+		tw.tween_property(st, "modulate:a", 0.25, d).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(st, "modulate:a", 1.0, d).set_trans(Tween.TRANS_SINE)
+	stars_root.modulate.a = 0.0
 
-	var hills := Polygon2D.new()
-	hills.polygon = PackedVector2Array([
-		Vector2(-80, 820), Vector2(180, 770), Vector2(380, 805),
-		Vector2(560, 760), Vector2(BASE_W + 80, 800),
-		Vector2(BASE_W + 80, BASE_H + 80), Vector2(-80, BASE_H + 80),
-	])
-	hills.color = Color(0.79, 0.55, 0.42, 0.45)
-	layer.add_child(hills)
+	halo_node = Polygon2D.new()
+	halo_node.polygon = _circle_polygon(150.0, 28)
+	halo_node.color = Color(0.99, 0.93, 0.81, 0.35)
+	halo_node.position = Vector2(520, 200)
+	layer.add_child(halo_node)
+	sun_node = Polygon2D.new()
+	sun_node.polygon = _circle_polygon(70.0, 28)
+	sun_node.color = Color("FCEBCF")
+	sun_node.position = Vector2(520, 200)
+	layer.add_child(sun_node)
+
+	# Два слоя холмов (дальний/ближний) для параллакса при подъёме.
+	hill_far = _make_hill([Vector2(-80, 880), Vector2(220, 840), Vector2(470, 870),
+			Vector2(700, 835), Vector2(BASE_W + 80, 865)], Color(0.83, 0.62, 0.48))
+	layer.add_child(hill_far)
+	hill_near = _make_hill([Vector2(-80, 940), Vector2(180, 900), Vector2(380, 930),
+			Vector2(560, 895), Vector2(BASE_W + 80, 925)], Color(0.74, 0.50, 0.38))
+	layer.add_child(hill_near)
+	hill_far_y = hill_far.position.y
+	hill_near_y = hill_near.position.y
+
+	# Лёгкие частицы-пылинки, медленно плывут вверх.
+	motes = CPUParticles2D.new()
+	motes.amount = 22
+	motes.lifetime = 7.0
+	motes.preprocess = 4.0
+	motes.position = Vector2(BASE_W / 2.0, BASE_H + 20)
+	motes.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	motes.emission_rect_extents = Vector2(BASE_W / 2.0, 10)
+	motes.direction = Vector2(0, -1)
+	motes.spread = 18.0
+	motes.gravity = Vector2(8, -16)
+	motes.initial_velocity_min = 10.0
+	motes.initial_velocity_max = 26.0
+	motes.scale_amount_min = 2.0
+	motes.scale_amount_max = 4.0
+	motes.color = Color(1, 1, 1, 0.18)
+	layer.add_child(motes)
+
+	atmo_active = true
+	_update_atmosphere()
+
+func _make_hill(pts: Array, col: Color) -> Polygon2D:
+	var poly := PackedVector2Array(pts)
+	poly.append(Vector2(BASE_W + 80, BASE_H + 200))
+	poly.append(Vector2(-80, BASE_H + 200))
+	var h := Polygon2D.new()
+	h.polygon = poly
+	h.color = col
+	return h
+
+# Палитра атмосферы по фазам (порог по счёту): рассвет→день→закат→ночь.
+# Каждая фаза: [score, top, mid, bot, sun, sun_y, ground, star_a]
+func _atmo_phases() -> Array:
+	return [
+		[0.0,  Color("F8D9A0"), Color("F2B97E"), Color("E89B79"), Color("FCEBCF"), 200.0, Color(0.83, 0.62, 0.48), 0.0],
+		[10.0, Color("9CC9E8"), Color("C7E2EC"), Color("E6EFDD"), Color("FFF7DA"), 150.0, Color(0.64, 0.72, 0.56), 0.0],
+		[20.0, Color("66689E"), Color("D98E72"), Color("F0A86E"), Color("FF9A5A"), 320.0, Color(0.52, 0.40, 0.50), 0.18],
+		[30.0, Color("161E3A"), Color("273056"), Color("433F66"), Color("E7E9F6"), 190.0, Color(0.20, 0.20, 0.34), 1.0],
+	]
+
+# Плавно смешиваем небо/солнце/холмы/звёзды по текущей высоте башни.
+var _atmo_p: float = 0.0
+func _update_atmosphere() -> void:
+	if not atmo_active:
+		return
+	var phases := _atmo_phases()
+	var target: float = clampf(float(score), 0.0, phases[phases.size() - 1][0])
+	_atmo_p = lerp(_atmo_p, target, 0.04)
+	# Найти сегмент фаз.
+	var i := 0
+	while i < phases.size() - 2 and _atmo_p > phases[i + 1][0]:
+		i += 1
+	var a: Array = phases[i]
+	var b: Array = phases[i + 1]
+	var f: float = clampf((_atmo_p - a[0]) / maxf(1.0, b[0] - a[0]), 0.0, 1.0)
+	sky_grad.colors = PackedColorArray([a[1].lerp(b[1], f), a[2].lerp(b[2], f), a[3].lerp(b[3], f)])
+	var suncol: Color = a[4].lerp(b[4], f)
+	sun_node.color = suncol
+	sun_node.position.y = lerp(float(a[5]), float(b[5]), f)
+	halo_node.position.y = sun_node.position.y
+	halo_node.color = Color(suncol.r, suncol.g, suncol.b, 0.30)
+	var ground: Color = a[6].lerp(b[6], f)
+	hill_far.color = ground
+	hill_near.color = ground.darkened(0.18)
+	stars_root.modulate.a = lerp(float(a[7]), float(b[7]), f)
+	motes.color = Color(suncol.r, suncol.g, suncol.b, 0.16)
+	# Параллакс холмов при подъёме камеры.
+	if camera:
+		var climb: float = start_cam_y - camera.position.y
+		hill_far.position.y = hill_far_y + climb * 0.04
+		hill_near.position.y = hill_near_y + climb * 0.08
 
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
@@ -414,6 +522,7 @@ func _process(delta: float) -> void:
 		var target_y := top_y - 150.0
 		camera.position.y = lerp(camera.position.y, target_y, clamp(delta * 3.0, 0.0, 1.0))
 	_update_parallax()
+	_update_atmosphere()
 
 func _physics_process(_delta: float) -> void:
 	if state == State.GAME_OVER:
