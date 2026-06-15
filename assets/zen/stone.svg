@@ -1,6 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="253" height="76" viewBox="-4 -4 253 76" role="img">
-  <rect x="0" y="0" width="245" height="68" rx="34" fill="#66717A" stroke="#28313A" stroke-width="4"/>
-  <path d="M10,39.44 C70,57.8 165,55.76 235,38.08 L235,58 C175,68 70,68 10,58 Z" fill="#38404A" opacity=".35"/>
-  <path d="M32,17 C75,3.4 105,8.16 135,16.32" fill="none" stroke="#A8ADB2" stroke-width="8" stroke-linecap="round" opacity=".55"/>
-  <path d="M155,15.64 C185,9.52 216,12.24 230,20.4" fill="none" stroke="#A8ADB2" stroke-width="4" stroke-linecap="round" opacity=".25"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="244" height="72" viewBox="-2 -2 244 72" role="img">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8C95A8"/>
+      <stop offset="55%" stop-color="#646C82"/>
+      <stop offset="100%" stop-color="#454C62"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="120" cy="64" rx="118" ry="9" fill="#0E0A1C" opacity="0.28"/>
+  <rect x="0" y="0" width="240" height="64" rx="32" fill="url(#g)"/>
+  <path d="M22,10 C70,-2 175,-2 218,10" fill="none" stroke="#F4B888" stroke-width="5" stroke-linecap="round" opacity="0.5"/>
+  <path d="M40,16 C80,8 120,8 150,15" fill="none" stroke="#C9D0DE" stroke-width="6" stroke-linecap="round" opacity="0.45"/>
+  <path d="M18,46 C70,60 175,60 222,46 L222,52 C175,64 70,64 18,52 Z" fill="#2C3145" opacity="0.45"/>
 </svg>

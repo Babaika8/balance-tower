@@ -493,11 +493,9 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 func _add_hand_top(parent: Node, size: Vector2) -> void:
 	var hand_tex: Texture2D = theme.get("hand")
 	if hand_tex:
-		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.9)
-		var hand_h := hand_tex.get_height() * sp.scale.y
-		# Точка хвата (между пальцами и большим) смещена от центра картинки —
-		# сдвигаем спрайт так, чтобы хват пришёлся ровно на камень.
-		sp.position = Vector2(10.0, -size.y / 2.0 - hand_h / 2.0 + 250.0)
+		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.1)
+		# В hand.svg кончики пальцев ~ y=185 при центре viewBox 105 → +80 от центра.
+		sp.position = Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 14.0)
 		parent.add_child(sp)
 		parent.set_meta("hand_node", sp)
 		return
