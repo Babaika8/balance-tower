@@ -592,7 +592,15 @@ func _animate_release(c: Node2D) -> void:
 
 const THEME_DIR := "res://assets/zen/"
 
+# false — вернуться к самому первому виду «тёплый рассвет» (всё рисуется кодом:
+# градиентное небо, солнце, холмы, камни-булыжники, рука). true — подхватить
+# SVG-скин из assets/zen/ (самурайская сцена и т.п.). Переключатель арта.
+const USE_ART := false
+
 func _load_theme() -> void:
+	if not USE_ART:
+		theme = {"stones": [], "hand": null, "hand_release": null}
+		return
 	theme = {
 		"stones": [],
 		"hand": _tex(THEME_DIR + "hand.svg"),
