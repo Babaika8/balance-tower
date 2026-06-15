@@ -110,6 +110,7 @@ func _setup_background() -> void:
 		add_child(bg)
 		# Цвет очистки = верхний пиксель фона (если башня перерастёт картинку).
 		RenderingServer.set_default_clear_color(_top_color(bg_tex))
+		_add_sky_life(bottom_y, bg_h)
 		return
 
 	var layer := CanvasLayer.new()
@@ -150,6 +151,43 @@ func _setup_background() -> void:
 	])
 	hills.color = Color(0.79, 0.55, 0.42, 0.45)
 	layer.add_child(hills)
+
+func _add_sky_life(bottom_y: float, bg_h: float) -> void:
+	var sky_top := bottom_y - bg_h
+	# Мерцающие звёзды в верхней (небесной) части фона.
+	for i in range(18):
+		var st := Polygon2D.new()
+		st.polygon = _circle_polygon(randf_range(2.0, 3.6), 8)
+		st.color = Color(1, 1, 1)
+		st.z_index = -90
+		st.position = Vector2(randf_range(50, BASE_W - 50), sky_top + randf_range(120, 1000))
+		st.modulate.a = randf_range(0.3, 1.0)
+		add_child(st)
+		var d := randf_range(0.7, 1.6)
+		var tw := create_tween().set_loops()
+		tw.tween_property(st, "modulate:a", 0.25, d).set_trans(Tween.TRANS_SINE)
+		tw.tween_property(st, "modulate:a", 1.0, d).set_trans(Tween.TRANS_SINE)
+	# Плывущие облака в полосе заката.
+	for i in range(3):
+		var cl := _make_cloud()
+		cl.z_index = -92
+		cl.position = Vector2(randf_range(0, BASE_W), sky_top + randf_range(380, 820))
+		add_child(cl)
+		var dur := randf_range(26.0, 42.0)
+		var tw2 := create_tween().set_loops()
+		tw2.tween_property(cl, "position:x", BASE_W + 260.0, dur)
+		tw2.tween_callback(func() -> void: cl.position.x = -260.0)
+
+func _make_cloud() -> Node2D:
+	var n := Node2D.new()
+	var col := Color(1, 1, 1, 0.13)
+	for p in [[0.0, 0.0, 72.0, 26.0], [52.0, 8.0, 56.0, 22.0], [-48.0, 10.0, 50.0, 20.0], [16.0, -14.0, 48.0, 22.0]]:
+		var e := Polygon2D.new()
+		e.polygon = _ellipse_polygon(p[2], p[3], 18)
+		e.color = col
+		e.position = Vector2(p[0], p[1])
+		n.add_child(e)
+	return n
 
 func _setup_camera() -> void:
 	camera = Camera2D.new()
@@ -414,10 +452,12 @@ func _animate_release(c: Node2D) -> void:
 		var hn = c.get_meta("hand_node")
 		if is_instance_valid(hn):
 			hn.texture = hand_rel
+	# Бросок: рука дёргается вверх, чуть отклоняется и тает.
 	var tw := create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(c, "position:y", c.position.y - 70.0, 0.22)
-	tw.tween_property(c, "modulate:a", 0.0, 0.22)
+	tw.tween_property(c, "position:y", c.position.y - 110.0, 0.30).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_IN)
+	tw.tween_property(c, "rotation", -0.18, 0.30)
+	tw.tween_property(c, "modulate:a", 0.0, 0.30).set_delay(0.10)
 	tw.set_parallel(false)
 	tw.tween_callback(c.queue_free)
 
@@ -498,6 +538,11 @@ func _add_hand_top(parent: Node, size: Vector2) -> void:
 		sp.position = Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 14.0)
 		parent.add_child(sp)
 		parent.set_meta("hand_node", sp)
+		# Лёгкое «дыхание» руки, пока держит камень.
+		var by := sp.position.y
+		var bt := create_tween().set_loops()
+		bt.tween_property(sp, "position:y", by - 6.0, 0.9).set_trans(Tween.TRANS_SINE)
+		bt.tween_property(sp, "position:y", by, 0.9).set_trans(Tween.TRANS_SINE)
 		return
 
 	var skin := Color("E8C49C")

@@ -5,25 +5,25 @@
       <stop offset="100%" stop-color="#DE9568"/>
     </linearGradient>
   </defs>
-  <g stroke="#B06A44" stroke-width="10" stroke-linejoin="round" stroke-linecap="round" fill="#B06A44">
-    <ellipse cx="120" cy="58" rx="82" ry="46"/>
-    <rect x="46" y="88" width="26" height="92" rx="13"/>
-    <rect x="80" y="92" width="26" height="96" rx="13"/>
-    <rect x="114" y="92" width="26" height="94" rx="13"/>
-    <rect x="148" y="88" width="26" height="86" rx="13"/>
-    <ellipse cx="196" cy="108" rx="20" ry="38"/>
+  <g stroke="#B06A44" stroke-width="8" stroke-linejoin="round" stroke-linecap="round" fill="#B06A44">
+    <ellipse cx="118" cy="56" rx="80" ry="44"/>
+    <rect x="40" y="86" width="24" height="92" rx="12"/>
+    <rect x="74" y="90" width="24" height="100" rx="12"/>
+    <rect x="110" y="90" width="24" height="98" rx="12"/>
+    <rect x="146" y="86" width="24" height="88" rx="12"/>
+    <ellipse cx="194" cy="104" rx="18" ry="36"/>
   </g>
   <g fill="url(#sk)">
-    <ellipse cx="120" cy="58" rx="82" ry="46"/>
-    <rect x="46" y="88" width="26" height="92" rx="13"/>
-    <rect x="80" y="92" width="26" height="96" rx="13"/>
-    <rect x="114" y="92" width="26" height="94" rx="13"/>
-    <rect x="148" y="88" width="26" height="86" rx="13"/>
-    <ellipse cx="196" cy="108" rx="20" ry="38"/>
+    <ellipse cx="118" cy="56" rx="80" ry="44"/>
+    <rect x="40" y="86" width="24" height="92" rx="12"/>
+    <rect x="74" y="90" width="24" height="100" rx="12"/>
+    <rect x="110" y="90" width="24" height="98" rx="12"/>
+    <rect x="146" y="86" width="24" height="88" rx="12"/>
+    <ellipse cx="194" cy="104" rx="18" ry="36"/>
   </g>
-  <path d="M70,96 q50,-16 100,0" fill="none" stroke="#C97E55" stroke-width="5" opacity="0.5"/>
+  <path d="M64,94 q54,-16 108,0" fill="none" stroke="#C97E55" stroke-width="5" opacity="0.5"/>
   <g fill="#F8D2AC" opacity="0.6">
-    <ellipse cx="59" cy="172" rx="9" ry="7"/><ellipse cx="93" cy="180" rx="9" ry="7"/>
-    <ellipse cx="127" cy="178" rx="9" ry="7"/><ellipse cx="161" cy="166" rx="9" ry="7"/>
+    <ellipse cx="52" cy="170" rx="8" ry="7"/><ellipse cx="86" cy="182" rx="8" ry="7"/>
+    <ellipse cx="122" cy="180" rx="8" ry="7"/><ellipse cx="158" cy="166" rx="8" ry="7"/>
   </g>
 </svg>
