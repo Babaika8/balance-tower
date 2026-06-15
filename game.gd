@@ -54,7 +54,7 @@ var motes: CPUParticles2D
 var atmo_stars: Array = []   # {node, nx, ny}
 var atmo_dunes: Array = []   # {node, base_y, factor, shade}
 var atmo_clouds: Array = []  # {node, nx, speed, ny}
-var atmo_sakura: Array = []  # {node, nx, base_y, canopy:[Polygon2D]}
+var atmo_props: Array = []   # ёлочки/домики/сакуры: {node, nx, base_y, factor}
 
 func _ready() -> void:
 	randomize()
@@ -185,21 +185,13 @@ func _setup_background() -> void:
 	sun_node.color = Color("FCEBCF")
 	layer.add_child(sun_node)
 
-	# Облака (плывут по небу, тинт под фазу).
+	# Облака (плывут по небу медленно, тинт под фазу).
 	for i in range(5):
 		var cl := _make_cloud()
 		cl.scale = Vector2(randf_range(1.0, 1.8), randf_range(1.0, 1.8))
 		layer.add_child(cl)
-		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.006, 0.014),
+		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
 				"ny": randf_range(120, 480)})
-
-	# Сакуры на заднем плане (за дюнами): тёмный ствол + розовые соцветия.
-	for i in range(6):
-		var sk := _make_sakura(randf_range(0.9, 1.4))
-		layer.add_child(sk["node"])
-		sk["nx"] = randf()
-		sk["base_y"] = randf_range(770, 840)
-		atmo_sakura.append(sk)
 
 	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), параллакс по высоте.
 	# base_y — мировой уровень гребня; factor — скорость параллакса; shade — затемнение.
@@ -212,6 +204,24 @@ func _setup_background() -> void:
 		var dn := _make_dune(sp[1], 7 + i, i * 13 + 3)
 		layer.add_child(dn)
 		atmo_dunes.append({"node": dn, "base_y": sp[0], "factor": sp[2], "shade": sp[3]})
+
+	# Объекты на лугах: ёлочки, домики, сакуры — разной глубины (выше/ниже,
+	# дальше/ближе). band: [base_y, scale, parallax]. Стоят перед дюнами, тускнеют к ночи.
+	var bands := [[768.0, 0.60, 0.028], [852.0, 0.84, 0.042], [948.0, 1.06, 0.056], [1052.0, 1.32, 0.072]]
+	var plan := [
+		["fir", 0], ["fir", 1], ["fir", 2], ["fir", 3], ["fir", 1], ["fir", 3],
+		["house", 0], ["house", 1], ["house", 2], ["house", 3], ["house", 2],
+		["sakura", 1], ["sakura", 2], ["sakura", 1],
+	]
+	for pr in plan:
+		var b: Array = bands[pr[1]]
+		var node: Node2D
+		match pr[0]:
+			"fir": node = _make_fir(b[1])
+			"house": node = _make_house(b[1])
+			_: node = _make_sakura(b[1])
+		layer.add_child(node)
+		atmo_props.append({"node": node, "nx": randf(), "base_y": b[0] + randf_range(-12, 12), "factor": b[2]})
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -251,29 +261,66 @@ func _make_dune(amp: float, step_seed: int, seed: int) -> Polygon2D:
 	p.polygon = pts
 	return p
 
-func _make_sakura(scale: float) -> Dictionary:
+func _make_sakura(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	# ствол с парой веток
 	var trunk := Polygon2D.new()
-	trunk.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(4, -70), Vector2(-4, -70)])
+	trunk.polygon = PackedVector2Array([Vector2(-6, 0), Vector2(6, 0), Vector2(4, -58), Vector2(-4, -58)])
 	trunk.color = Color("3A2A2E")
 	n.add_child(trunk)
 	for bx in [-1, 1]:
 		var br := Polygon2D.new()
-		br.polygon = PackedVector2Array([Vector2(0, -50), Vector2(6 * bx, -52), Vector2(30 * bx, -96), Vector2(22 * bx, -96)])
+		br.polygon = PackedVector2Array([Vector2(0, -42), Vector2(5 * bx, -44), Vector2(26 * bx, -82), Vector2(19 * bx, -82)])
 		br.color = Color("3A2A2E")
 		n.add_child(br)
-	# крона — кластеры розовых кругов
-	var canopy: Array = []
-	for c in [[0, -104, 40], [-32, -92, 30], [34, -94, 30], [-12, -126, 28], [18, -122, 26]]:
+	for c in [[0, -90, 34], [-28, -80, 26], [30, -82, 26], [-10, -108, 24], [16, -104, 22]]:
 		var bl := Polygon2D.new()
 		bl.polygon = _circle_polygon(float(c[2]), 16)
 		bl.position = Vector2(c[0], c[1])
 		bl.color = Color("F1C7E4")
 		n.add_child(bl)
-		canopy.append(bl)
-	return {"node": n, "canopy": canopy, "nx": 0.0, "base_y": 800.0}
+	return n
+
+# Треугольная ёлочка (как в референсе): тёмная, ярусами + ствол.
+func _make_fir(scale: float) -> Node2D:
+	var n := Node2D.new()
+	n.scale = Vector2(scale, scale)
+	var trunk := Polygon2D.new()
+	trunk.polygon = PackedVector2Array([Vector2(-5, 0), Vector2(5, 0), Vector2(5, -18), Vector2(-5, -18)])
+	trunk.color = Color("4A3A33")
+	n.add_child(trunk)
+	var col := Color("3C4A3A")
+	var tiers := [[-14, 64, 46], [-40, 52, 44], [-66, 40, 42]]  # [base_y, halfw, height]
+	for t in tiers:
+		var tri := Polygon2D.new()
+		tri.polygon = PackedVector2Array([Vector2(-t[1], t[0]), Vector2(0, t[0] - t[2]), Vector2(t[1], t[0])])
+		tri.color = col
+		n.add_child(tri)
+	return n
+
+# Японский домик: тело + широкая скатная крыша с навесом, дверь.
+func _make_house(scale: float) -> Node2D:
+	var n := Node2D.new()
+	n.scale = Vector2(scale, scale)
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-34, 0), Vector2(34, 0), Vector2(34, -44), Vector2(-34, -44)])
+	body.color = Color("CDA877")
+	n.add_child(body)
+	var door := Polygon2D.new()
+	door.polygon = PackedVector2Array([Vector2(-9, 0), Vector2(9, 0), Vector2(9, -26), Vector2(-9, -26)])
+	door.color = Color("5B4636")
+	n.add_child(door)
+	for wx in [-22, 22]:
+		var win := Polygon2D.new()
+		win.polygon = _ellipse_polygon(6, 7, 8)
+		win.position = Vector2(wx, -30)
+		win.color = Color("6E5A40")
+		n.add_child(win)
+	var roof := Polygon2D.new()
+	roof.polygon = PackedVector2Array([Vector2(-50, -42), Vector2(0, -78), Vector2(50, -42), Vector2(36, -42), Vector2(0, -68), Vector2(-36, -42)])
+	roof.color = Color("6E5A63")
+	n.add_child(roof)
+	return n
 
 # Палитра атмосферы по фазам (порог по счёту): рассвет→день→закат→ночь.
 # Каждая фаза: [score, top, mid, bot, sun, sun_y, ground, star_a]
@@ -332,11 +379,11 @@ func _update_atmosphere() -> void:
 		sn.position = Vector2(s["nx"] * vw, s["ny"])
 		sn.self_modulate.a = star_a
 
-	# Облака плывут, тинт под фазу (днём светлее, ночью почти прячутся).
+	# Облака плывут медленно слева-направо, тинт под фазу (ночью почти прячутся).
 	for c in atmo_clouds:
-		c["nx"] = fmod(c["nx"] + c["speed"] * dt + 1.1, 1.2)
+		c["nx"] = fmod(c["nx"] + c["speed"] * dt, 1.0)
 		var cn: Node2D = c["node"]
-		cn.position = Vector2((c["nx"] - 0.1) * vw, c["ny"])
+		cn.position = Vector2(lerp(-240.0, vw + 240.0, c["nx"]), c["ny"])
 		cn.modulate = Color(suncol.r, suncol.g, suncol.b, lerp(0.5, 0.12, night))
 
 	# Дюны: центр по экрану, цвет от фазы (дальше — светлее, ближе — темнее), параллакс.
@@ -345,11 +392,11 @@ func _update_atmosphere() -> void:
 		dn.color = ground.darkened(d["shade"])
 		dn.position = Vector2(cx, d["base_y"] + climb * d["factor"])
 
-	# Сакуры за дюнами: по всей ширине, крона тускнеет к ночи.
-	for sk in atmo_sakura:
-		var skn: Node2D = sk["node"]
-		skn.position = Vector2(sk["nx"] * vw, sk["base_y"] + climb * 0.045)
-		skn.modulate = Color(1, 1, 1).lerp(Color(0.45, 0.45, 0.6), night * 0.85)
+	# Объекты на лугах (ёлочки/домики/сакуры): по всей ширине, тускнеют к ночи.
+	for p in atmo_props:
+		var pn: Node2D = p["node"]
+		pn.position = Vector2(p["nx"] * vw, p["base_y"] + climb * p["factor"])
+		pn.modulate = Color(1, 1, 1).lerp(Color(0.42, 0.42, 0.56), night * 0.85)
 
 	# Частицы — на всю ширину у нижней кромки.
 	motes.position = Vector2(cx, vh + 20.0)
