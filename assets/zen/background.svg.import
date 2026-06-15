@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bbnxsq772krj1"
-path="res://.godot/imported/hand1.png-cb9a31ea8be4aa682aaf788e91da3ef8.ctex"
+uid="uid://0w1qyurnu2wo"
+path="res://.godot/imported/background.svg-561d4ae5b89161e2a47bf11a1baa5f1a.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/zen/hand1.png"
-dest_files=["res://.godot/imported/hand1.png-cb9a31ea8be4aa682aaf788e91da3ef8.ctex"]
+source_file="res://assets/zen/background.svg"
+dest_files=["res://.godot/imported/background.svg-561d4ae5b89161e2a47bf11a1baa5f1a.ctex"]
 
 [params]
 
@@ -38,3 +38,6 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
+svg/scale=1.0
+editor/scale_with_editor_scale=false
+editor/convert_colors_with_editor_theme=false

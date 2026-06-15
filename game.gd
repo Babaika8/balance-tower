@@ -81,8 +81,21 @@ func _auto_shot() -> void:
 # ---------- Сцена / окружение ----------
 
 func _setup_background() -> void:
-	# Высокий фон-картинка живёт в мире и едет вниз, пока камера поднимается.
 	var bg_tex: Texture2D = theme.get("background")
+	# Фон ~в один экран — крепим к экрану; высокий — пускаем в мир (едет вниз).
+	if bg_tex and bg_tex.get_height() < bg_tex.get_width() * 2.2:
+		var flayer := CanvasLayer.new()
+		flayer.layer = -10
+		add_child(flayer)
+		var frect := TextureRect.new()
+		frect.texture = bg_tex
+		frect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+		frect.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		flayer.add_child(frect)
+		RenderingServer.set_default_clear_color(_top_color(bg_tex))
+		return
+
+	# Высокий фон-картинка живёт в мире и едет вниз, пока камера поднимается.
 	if bg_tex:
 		var bg := Sprite2D.new()
 		bg.texture = bg_tex
@@ -417,14 +430,12 @@ const THEME_DIR := "res://assets/zen/"
 func _load_theme() -> void:
 	theme = {
 		"stones": [],
-		"hand": _tex(THEME_DIR + "hand1.png"),       # кадр «держит»
-		"hand_release": _tex(THEME_DIR + "hand2.png"),  # кадр «отпустил»
-		"background": _tex(THEME_DIR + "background.png"),
-		"pedestal": _tex(THEME_DIR + "pedestal.png"),
+		"hand": _tex(THEME_DIR + "hand.svg"),
+		"hand_release": null,
+		"background": _tex(THEME_DIR + "background.svg"),
+		"pedestal": _tex(THEME_DIR + "pedestal.svg"),
 	}
-	if theme["hand"] == null:
-		theme["hand"] = _tex(THEME_DIR + "hand.png")
-	for n in ["stone.png", "stone2.png", "stone3.png", "stone4.png"]:
+	for n in ["stone.svg", "stone2.svg", "stone3.svg", "stone4.svg"]:
 		var t := _tex(THEME_DIR + n)
 		if t:
 			theme["stones"].append(t)
