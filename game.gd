@@ -51,6 +51,8 @@ var sky_grad: Gradient
 var sun_node: Polygon2D
 var halo_node: Polygon2D
 var motes: CPUParticles2D
+var petals: CPUParticles2D
+var atmo_fireflies: Array = []  # {node, nx, ny, phase}
 var atmo_stars: Array = []   # {node, nx, ny}
 var atmo_dunes: Array = []   # {node, base_y, factor, shade}
 var atmo_clouds: Array = []  # {node, nx, speed, ny}
@@ -212,6 +214,7 @@ func _setup_background() -> void:
 		var puff := _make_sakura_puff(randf_range(1.2, 1.8))
 		layer.add_child(puff)
 		atmo_props.append({"node": puff, "nx": 0.04 + i * 0.115 + randf_range(-0.02, 0.02), "base_y": 700.0, "factor": 0.12})
+		_attach_sway(puff, randf_range(0.01, 0.022), randf_range(2.6, 4.0))
 	var forest := _make_forest_row()
 	layer.add_child(forest)
 	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
@@ -227,6 +230,7 @@ func _setup_background() -> void:
 	var rhouse := _make_house(1.7)
 	layer.add_child(rhouse)
 	atmo_props.append({"node": rhouse, "nx": 0.70, "base_y": 905.0, "factor": 0.44})
+	_add_chimney_smoke(rhouse)
 	_add_fir(layer, 0.80, 905.0, 1.7, 0.44)
 	_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
 	_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
@@ -235,6 +239,7 @@ func _setup_background() -> void:
 	var lhouse := _make_house(2.4)
 	layer.add_child(lhouse)
 	atmo_props.append({"node": lhouse, "nx": 0.30, "base_y": 1018.0, "factor": 0.60})
+	_add_chimney_smoke(lhouse)
 	_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
 	_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
 	_add_fir(layer, 0.22, 1028.0, 1.8, 0.60)
@@ -261,8 +266,53 @@ func _setup_background() -> void:
 	motes.color = Color(1, 1, 1, 0.18)
 	layer.add_child(motes)
 
+	# Лепестки сакуры — падают и кружат сверху по всей ширине.
+	petals = CPUParticles2D.new()
+	petals.amount = 34
+	petals.lifetime = 9.0
+	petals.preprocess = 6.0
+	petals.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	petals.emission_rect_extents = Vector2(BASE_W, 6)
+	petals.direction = Vector2(0.3, 1)
+	petals.spread = 25.0
+	petals.gravity = Vector2(-14, 26)
+	petals.initial_velocity_min = 18.0
+	petals.initial_velocity_max = 42.0
+	petals.angular_velocity_min = -90.0
+	petals.angular_velocity_max = 90.0
+	petals.scale_amount_min = 3.0
+	petals.scale_amount_max = 6.0
+	petals.color = Color("F1C7E4")
+	layer.add_child(petals)
+
+	# Светлячки — мерцают и плавают, видны только ночью (низ сцены).
+	for i in range(16):
+		var ff := Polygon2D.new()
+		ff.polygon = _circle_polygon(randf_range(2.5, 4.5), 8)
+		ff.color = Color("EBF2A0")
+		layer.add_child(ff)
+		atmo_fireflies.append({"node": ff, "nx": randf(), "ny": randf_range(BASE_H * 0.55, BASE_H * 0.92),
+				"phase": randf() * TAU})
+
 	atmo_active = true
 	_update_atmosphere()
+
+# Дымок из трубы дома (дети ноды дома — едут и тускнеют вместе с ним).
+func _add_chimney_smoke(house: Node2D) -> void:
+	var sm := CPUParticles2D.new()
+	sm.amount = 14
+	sm.lifetime = 3.6
+	sm.preprocess = 2.5
+	sm.position = Vector2(1, -98)
+	sm.direction = Vector2(0.25, -1)
+	sm.spread = 10.0
+	sm.gravity = Vector2(4, -8)
+	sm.initial_velocity_min = 4.0
+	sm.initial_velocity_max = 8.0
+	sm.scale_amount_min = 2.2
+	sm.scale_amount_max = 5.0
+	sm.color = Color(0.97, 0.95, 0.97, 0.6)
+	house.add_child(sm)
 
 # Дюна: волнистый гребень вокруг y=0 (range -amp..0), залив до низа. Центрируется
 # по экрану через node.position в раскладке; ширина с запасом на любой экран.
@@ -292,6 +342,15 @@ func _add_fir(layer: CanvasLayer, nx: float, base_y: float, scale: float, factor
 	var fr := _make_fir(scale)
 	layer.add_child(fr)
 	atmo_props.append({"node": fr, "nx": nx, "base_y": base_y, "factor": factor})
+	_attach_sway(fr, randf_range(0.014, 0.03), randf_range(2.0, 3.4))
+
+# Лёгкое покачивание «на ветру» (вокруг основания ноды), зацикленное.
+func _attach_sway(node: Node2D, amp: float, period: float) -> void:
+	node.rotation = randf_range(-amp, amp)
+	var tw := node.create_tween().set_loops()
+	tw.tween_property(node, "rotation", amp, period).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(node, "rotation", -amp, period * 2.0).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(node, "rotation", 0.0, period).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 
 func _make_sakura(scale: float) -> Node2D:
 	var n := Node2D.new()
@@ -487,9 +546,22 @@ func _update_atmosphere() -> void:
 		pn.position = Vector2(p["nx"] * vw, p["base_y"] + climb * p["factor"])
 		pn.modulate = Color(1, 1, 1).lerp(Color(0.42, 0.42, 0.56), night * 0.85)
 
-	# Частицы — на всю ширину у нижней кромки.
+	# Частицы-пылинки — на всю ширину у нижней кромки.
 	motes.position = Vector2(cx, vh + 20.0)
 	motes.emission_rect_extents = Vector2(maxf(BASE_W, vw) / 2.0, 10.0)
+
+	# Лепестки сакуры — сыплются сверху по всей ширине; к ночи чуть тусклее.
+	petals.position = Vector2(cx, -20.0)
+	petals.emission_rect_extents = Vector2(maxf(BASE_W, vw) / 2.0, 6.0)
+	petals.self_modulate.a = lerp(1.0, 0.5, night)
+
+	# Светлячки — плавают и мерцают, видны только ночью (низ сцены).
+	var t: float = Time.get_ticks_msec() / 1000.0
+	for ff in atmo_fireflies:
+		var fn: Polygon2D = ff["node"]
+		var ph: float = ff["phase"]
+		fn.position = Vector2(ff["nx"] * vw + sin(t * 0.6 + ph) * 14.0, ff["ny"] + cos(t * 0.5 + ph) * 10.0)
+		fn.self_modulate.a = night * (0.35 + 0.45 * (0.5 + 0.5 * sin(t * 2.2 + ph)))
 
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
