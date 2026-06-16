@@ -197,38 +197,37 @@ func _setup_background() -> void:
 	# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
 	# nx у ёлок — только края (центр свободен под камни).
 
-	# --- ДАЛЬНИЙ ПЛАН ---
-	for nx in [0.15, 0.46, 0.82]:
-		var puff := _make_sakura_puff(randf_range(1.3, 1.9))
+	# --- ДАЛЬНИЙ ПЛАН: много сакур-облаков по всей ширине ---
+	for i in range(7):
+		var puff := _make_sakura_puff(randf_range(1.2, 1.8))
 		layer.add_child(puff)
-		atmo_props.append({"node": puff, "nx": nx + randf_range(-0.04, 0.04), "base_y": 700.0, "factor": 0.12})
+		atmo_props.append({"node": puff, "nx": 0.06 + i * 0.14 + randf_range(-0.025, 0.025), "base_y": 700.0, "factor": 0.12})
 	var forest := _make_forest_row()
 	layer.add_child(forest)
 	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
 
-	# --- СРЕДНИЙ ПЛАН: волны земли, между ними дома/ёлки ---
-	_add_dune(layer, 36.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
-	_add_dune(layer, 52.0, 8, 16, 840.0, 0.30, 0.10)  # волна 3
-	# мелкие краевые ёлки + ПРАВЫЙ дом — уйдут за волну 2
-	_add_fir(layer, 0.05, 880.0, 1.7, 0.40)
-	_add_fir(layer, 0.95, 900.0, 1.6, 0.40)
+	# --- СРЕДНИЙ ПЛАН: волны земли (сглаженные гребни); дома/ёлки сидят на земле,
+	# фундамент уходит за свою волну. Дома и ёлки разнесены по X (не слипаются). ---
+	_add_dune(layer, 26.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
+	_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.10)  # волна 3
+	# ПРАВЫЙ дом + правые краевые ёлки — фундамент за волну 2
 	var rhouse := _make_house(1.7)
 	layer.add_child(rhouse)
-	atmo_props.append({"node": rhouse, "nx": 0.85, "base_y": 952.0, "factor": 0.44})
-	_add_dune(layer, 50.0, 9, 29, 930.0, 0.44, 0.20)  # волна 2 (перекрывает правый дом)
-	# крупные краевые ёлки + ЛЕВЫЙ дом — уйдут за волну 1 (переднюю)
-	_add_fir(layer, 0.04, 1010.0, 2.5, 0.56)
-	_add_fir(layer, 0.2, 980.0, 2.1, 0.56)
-	_add_fir(layer, 0.8, 1000.0, 2.3, 0.56)
-	_add_fir(layer, 0.97, 1040.0, 2.6, 0.56)
-	var lhouse := _make_house(2.7)
+	atmo_props.append({"node": rhouse, "nx": 0.70, "base_y": 905.0, "factor": 0.44})
+	_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
+	_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
+	_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.20)  # волна 2 (закрывает фундамент правого дома)
+	# ЛЕВЫЙ дом + левые краевые ёлки — фундамент за переднюю волну 1
+	var lhouse := _make_house(2.4)
 	layer.add_child(lhouse)
-	atmo_props.append({"node": lhouse, "nx": 0.21, "base_y": 1095.0, "factor": 0.60})
-	_add_dune(layer, 46.0, 10, 42, 1040.0, 0.60, 0.30) # волна 1 (передняя, перекрывает левый дом)
+	atmo_props.append({"node": lhouse, "nx": 0.30, "base_y": 1018.0, "factor": 0.60})
+	_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
+	_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
+	_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.30) # волна 1 (передняя, закрывает фундамент левого дома)
 
 	# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
-	_add_fir(layer, -0.03, 1180.0, 3.4, 0.85)
-	_add_fir(layer, 1.03, 1200.0, 3.6, 0.90)
+	_add_fir(layer, -0.04, 1180.0, 3.4, 0.85)
+	_add_fir(layer, 1.04, 1200.0, 3.6, 0.90)
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -305,7 +304,7 @@ func _make_fir(scale: float) -> Node2D:
 	n.scale = Vector2(scale, scale)
 	var tri := Polygon2D.new()
 	tri.polygon = PackedVector2Array([Vector2(-32, 0), Vector2(0, -140), Vector2(32, 0)])
-	tri.color = Color("2A2440")
+	tri.color = Color("28392E")  # тёмно-зелёный — чтобы не сливаться с домами
 	n.add_child(tri)
 	return n
 
@@ -354,10 +353,10 @@ func _make_forest_row() -> Polygon2D:
 func _make_house(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	# тело
+	# тело (светлее ёлок, чтобы читался отдельно)
 	var body := Polygon2D.new()
 	body.polygon = PackedVector2Array([Vector2(-34, 0), Vector2(34, 0), Vector2(30, -42), Vector2(-30, -42)])
-	body.color = Color("2B2A4A")
+	body.color = Color("3C3B66")
 	n.add_child(body)
 	# вертикальные планки (как в референсе)
 	for sx in [-22, -8, 8, 22]:
