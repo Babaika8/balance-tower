@@ -193,6 +193,11 @@ func _setup_background() -> void:
 		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
 				"ny": randf_range(120, 480)})
 
+	# Дальняя кромка леса (силуэт треугольников, как в референсе) — за дюнами.
+	var forest := _make_forest_row()
+	layer.add_child(forest)
+	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.016, "shade": 0.42})
+
 	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), параллакс по высоте.
 	# base_y — мировой уровень гребня; factor — скорость параллакса; shade — затемнение.
 	var dune_specs := [
@@ -205,23 +210,28 @@ func _setup_background() -> void:
 		layer.add_child(dn)
 		atmo_dunes.append({"node": dn, "base_y": sp[0], "factor": sp[2], "shade": sp[3]})
 
-	# Объекты на лугах: ёлочки, домики, сакуры — разной глубины (выше/ниже,
-	# дальше/ближе). band: [base_y, scale, parallax]. Стоят перед дюнами, тускнеют к ночи.
-	var bands := [[768.0, 0.60, 0.028], [852.0, 0.84, 0.042], [948.0, 1.06, 0.056], [1052.0, 1.32, 0.072]]
-	var plan := [
-		["fir", 0], ["fir", 1], ["fir", 2], ["fir", 3], ["fir", 1], ["fir", 3],
-		["house", 0], ["house", 1], ["house", 2], ["house", 3], ["house", 2],
-		["sakura", 1], ["sakura", 2], ["sakura", 1],
-	]
-	for pr in plan:
-		var b: Array = bands[pr[1]]
-		var node: Node2D
-		match pr[0]:
-			"fir": node = _make_fir(b[1])
-			"house": node = _make_house(b[1])
-			_: node = _make_sakura(b[1])
-		layer.add_child(node)
-		atmo_props.append({"node": node, "nx": randf(), "base_y": b[0] + randf_range(-12, 12), "factor": b[2]})
+	# Сакуры — на дальнем плане (мелкие, у дальней гряды), как в референсе.
+	for nx in [0.16, 0.34, 0.74]:
+		var sk := _make_sakura(0.62)
+		layer.add_child(sk)
+		atmo_props.append({"node": sk, "nx": nx + randf_range(-0.03, 0.03), "base_y": 770.0, "factor": 0.03})
+
+	# Ёлки — простые тёмные треугольники, разной глубины.
+	var fir_plan := [[0.08, 800.0, 0.62, 0.04], [0.27, 880.0, 0.85, 0.05],
+			[0.5, 980.0, 1.05, 0.06], [0.66, 870.0, 0.8, 0.05],
+			[0.9, 1010.0, 1.1, 0.065], [0.97, 900.0, 0.9, 0.055]]
+	for fp in fir_plan:
+		var fr := _make_fir(fp[2])
+		layer.add_child(fr)
+		atmo_props.append({"node": fr, "nx": fp[0], "base_y": fp[1], "factor": fp[3]})
+
+	# Дома — плоский стиль пагоды. Один большой слева, один маленький справа.
+	var big := _make_house(1.4)
+	layer.add_child(big)
+	atmo_props.append({"node": big, "nx": 0.2, "base_y": 1000.0, "factor": 0.07})
+	var small := _make_house(0.7)
+	layer.add_child(small)
+	atmo_props.append({"node": small, "nx": 0.83, "base_y": 880.0, "factor": 0.05})
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -281,45 +291,78 @@ func _make_sakura(scale: float) -> Node2D:
 		n.add_child(bl)
 	return n
 
-# Треугольная ёлочка (как в референсе): тёмная, ярусами + ствол.
+# Ёлка — простой тёмный треугольник + маленький ствол (как в референсе).
 func _make_fir(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
 	var trunk := Polygon2D.new()
-	trunk.polygon = PackedVector2Array([Vector2(-5, 0), Vector2(5, 0), Vector2(5, -18), Vector2(-5, -18)])
-	trunk.color = Color("4A3A33")
+	trunk.polygon = PackedVector2Array([Vector2(-5, 0), Vector2(5, 0), Vector2(5, 16), Vector2(-5, 16)])
+	trunk.color = Color("2A2440")
 	n.add_child(trunk)
-	var col := Color("3C4A3A")
-	var tiers := [[-14, 64, 46], [-40, 52, 44], [-66, 40, 42]]  # [base_y, halfw, height]
-	for t in tiers:
-		var tri := Polygon2D.new()
-		tri.polygon = PackedVector2Array([Vector2(-t[1], t[0]), Vector2(0, t[0] - t[2]), Vector2(t[1], t[0])])
-		tri.color = col
-		n.add_child(tri)
+	var tri := Polygon2D.new()
+	tri.polygon = PackedVector2Array([Vector2(-30, 0), Vector2(0, -132), Vector2(30, 0)])
+	tri.color = Color("2A2440")
+	n.add_child(tri)
 	return n
 
-# Японский домик: тело + широкая скатная крыша с навесом, дверь.
+# Дальняя кромка леса: широкая полоса мелких треугольников (силуэт), центрируется
+# по экрану, перекрашивается как дюна. Как лес на среднем плане в референсе.
+func _make_forest_row() -> Polygon2D:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 99
+	var pts := PackedVector2Array()
+	var x := -3200.0
+	pts.append(Vector2(x, 6))
+	while x <= 3200.0:
+		var h := 22.0 + rng.randf() * 30.0
+		pts.append(Vector2(x, 6))
+		pts.append(Vector2(x + 13.0, -h))
+		pts.append(Vector2(x + 26.0, 6))
+		x += 26.0
+	pts.append(Vector2(3200.0, 2600.0))
+	pts.append(Vector2(-3200.0, 2600.0))
+	var p := Polygon2D.new()
+	p.polygon = pts
+	return p
+
+# Дом в стиле пагоды (плоский, как храм в референсе): тёмное тело, синий кант,
+# скатная крыша с поднятыми краями, красная дверь.
 func _make_house(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
+	# тело
 	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([Vector2(-34, 0), Vector2(34, 0), Vector2(34, -44), Vector2(-34, -44)])
-	body.color = Color("CDA877")
+	body.polygon = PackedVector2Array([Vector2(-34, 0), Vector2(34, 0), Vector2(30, -42), Vector2(-30, -42)])
+	body.color = Color("2B2A4A")
 	n.add_child(body)
+	# вертикальные планки (как в референсе)
+	for sx in [-22, -8, 8, 22]:
+		var sl := Polygon2D.new()
+		sl.polygon = PackedVector2Array([Vector2(sx - 3, -6), Vector2(sx + 3, -6), Vector2(sx + 3, -36), Vector2(sx - 3, -36)])
+		sl.color = Color("3A3960")
+		n.add_child(sl)
+	# красная дверь-тории
 	var door := Polygon2D.new()
-	door.polygon = PackedVector2Array([Vector2(-9, 0), Vector2(9, 0), Vector2(9, -26), Vector2(-9, -26)])
-	door.color = Color("5B4636")
+	door.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(7, -24), Vector2(-7, -24)])
+	door.color = Color("C8324E")
 	n.add_child(door)
-	for wx in [-22, 22]:
-		var win := Polygon2D.new()
-		win.polygon = _ellipse_polygon(6, 7, 8)
-		win.position = Vector2(wx, -30)
-		win.color = Color("6E5A40")
-		n.add_child(win)
+	# синий кант под крышей
+	var trim := Polygon2D.new()
+	trim.polygon = PackedVector2Array([Vector2(-32, -42), Vector2(32, -42), Vector2(32, -48), Vector2(-32, -48)])
+	trim.color = Color("4958B0")
+	n.add_child(trim)
+	# скатная крыша с приподнятыми краями
 	var roof := Polygon2D.new()
-	roof.polygon = PackedVector2Array([Vector2(-50, -42), Vector2(0, -78), Vector2(50, -42), Vector2(36, -42), Vector2(0, -68), Vector2(-36, -42)])
-	roof.color = Color("6E5A63")
+	roof.polygon = PackedVector2Array([
+		Vector2(-54, -46), Vector2(-44, -54), Vector2(0, -86), Vector2(44, -54),
+		Vector2(54, -46), Vector2(40, -48), Vector2(0, -74), Vector2(-40, -48)])
+	roof.color = Color("1E1D34")
 	n.add_child(roof)
+	# конёк
+	var top := Polygon2D.new()
+	top.polygon = PackedVector2Array([Vector2(-3, -84), Vector2(3, -84), Vector2(3, -98), Vector2(-3, -98)])
+	top.color = Color("C8324E")
+	n.add_child(top)
 	return n
 
 # Палитра атмосферы по фазам (порог по счёту): рассвет→день→закат→ночь.
