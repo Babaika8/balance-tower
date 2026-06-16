@@ -52,6 +52,7 @@ var sun_node: Polygon2D
 var halo_node: Polygon2D
 var motes: CPUParticles2D
 var petals: CPUParticles2D
+var atmo_glow: Sprite2D
 var atmo_fireflies: Array = []  # {node, nx, ny, phase}
 var atmo_stars: Array = []   # {node, nx, ny}
 var atmo_dunes: Array = []   # {node, base_y, factor, shade}
@@ -196,6 +197,11 @@ func _setup_background() -> void:
 		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
 				"ny": randf_range(100, 540)})
 
+	# Тёплый отсвет у горизонта (бликует под цвет солнца) — фокус и глубина.
+	atmo_glow = Sprite2D.new()
+	atmo_glow.texture = _tex(THEME_DIR + "smoke.svg")
+	layer.add_child(atmo_glow)
+
 	# Птицы — лёгкие силуэты, летят по небу (оживляют пустоту, особенно на широком).
 	for i in range(5):
 		var bird := _make_bird()
@@ -217,7 +223,7 @@ func _setup_background() -> void:
 		_attach_sway(puff, randf_range(0.01, 0.022), randf_range(2.6, 4.0))
 	var forest := _make_forest_row()
 	layer.add_child(forest)
-	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
+	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.50})
 
 	# --- СРЕДНИЙ ПЛАН: волны земли (сглаженные гребни); дома/ёлки сидят на земле,
 	# фундамент уходит за свою волну. Дома и ёлки разнесены по X (не слипаются). ---
@@ -225,7 +231,7 @@ func _setup_background() -> void:
 	# мелкие дальние ёлки (плотность у горизонта, по бокам от центра)
 	_add_fir(layer, 0.34, 800.0, 1.1, 0.30)
 	_add_fir(layer, 0.64, 805.0, 1.2, 0.30)
-	_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.10)  # волна 3
+	_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.18)  # волна 3
 	# ПРАВЫЙ дом + правые краевые ёлки — фундамент за волну 2
 	var rhouse := _make_house(1.7)
 	layer.add_child(rhouse)
@@ -234,7 +240,7 @@ func _setup_background() -> void:
 	_add_fir(layer, 0.80, 905.0, 1.7, 0.44)
 	_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
 	_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
-	_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.20)  # волна 2 (закрывает фундамент правого дома)
+	_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.32)  # волна 2 (закрывает фундамент правого дома)
 	# ЛЕВЫЙ дом + левые краевые ёлки — фундамент за переднюю волну 1
 	var lhouse := _make_house(2.4)
 	layer.add_child(lhouse)
@@ -243,11 +249,11 @@ func _setup_background() -> void:
 	_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
 	_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
 	_add_fir(layer, 0.22, 1028.0, 1.8, 0.60)
-	_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.30) # волна 1 (передняя, закрывает фундамент левого дома)
+	_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.46) # волна 1 (передняя, тёмная — контраст/глубина)
 
 	# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
-	_add_fir(layer, -0.04, 1180.0, 3.4, 0.85)
-	_add_fir(layer, 1.04, 1200.0, 3.6, 0.90)
+	_add_fir(layer, -0.05, 1190.0, 4.2, 0.85)
+	_add_fir(layer, 1.05, 1210.0, 4.4, 0.90)
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -447,43 +453,55 @@ func _make_forest_row() -> Polygon2D:
 	p.polygon = pts
 	return p
 
-# Дом в стиле пагоды (плоский, как храм в референсе): тёмное тело, синий кант,
-# скатная крыша с поднятыми краями, красная дверь.
+# Крыша пагоды: широкая, с загнутыми ВВЕРХ краями (азиатский карниз).
+func _pagoda_roof(ey: float, hw: float, h: float, col: String) -> Polygon2D:
+	var p := Polygon2D.new()
+	p.polygon = PackedVector2Array([
+		Vector2(-hw, ey - h * 0.40),         # левый карниз — загнут вверх
+		Vector2(-hw * 0.82, ey - h * 0.04),
+		Vector2(-hw * 0.55, ey + 6),         # провис карниза
+		Vector2(0, ey - h),                  # конёк
+		Vector2(hw * 0.55, ey + 6),
+		Vector2(hw * 0.82, ey - h * 0.04),
+		Vector2(hw, ey - h * 0.40),          # правый карниз — загнут вверх
+		Vector2(hw * 0.7, ey + 14),
+		Vector2(0, ey + 14),
+		Vector2(-hw * 0.7, ey + 14)])
+	p.color = Color(col)
+	return p
+
+func _trim_band(y: float, hw: float) -> Polygon2D:
+	var t := Polygon2D.new()
+	t.polygon = PackedVector2Array([Vector2(-hw, y), Vector2(hw, y), Vector2(hw, y + 5), Vector2(-hw, y + 5)])
+	t.color = Color("4958B0")
+	return t
+
+# Дом как раньше (одна крыша), но с загнутыми вверх карнизами — азиатский акцент.
 func _make_house(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	# тело (светлее ёлок, чтобы читался отдельно)
+	# тело
 	var body := Polygon2D.new()
 	body.polygon = PackedVector2Array([Vector2(-34, 0), Vector2(34, 0), Vector2(30, -42), Vector2(-30, -42)])
 	body.color = Color("3C3B66")
 	n.add_child(body)
-	# вертикальные планки (как в референсе)
 	for sx in [-22, -8, 8, 22]:
 		var sl := Polygon2D.new()
 		sl.polygon = PackedVector2Array([Vector2(sx - 3, -6), Vector2(sx + 3, -6), Vector2(sx + 3, -36), Vector2(sx - 3, -36)])
-		sl.color = Color("3A3960")
+		sl.color = Color("33325A")
 		n.add_child(sl)
-	# красная дверь-тории
 	var door := Polygon2D.new()
 	door.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(7, -24), Vector2(-7, -24)])
 	door.color = Color("C8324E")
 	n.add_child(door)
-	# сплошная скатная крыша (низ заходит на тело — без «дыры»)
-	var roof := Polygon2D.new()
-	roof.polygon = PackedVector2Array([
-		Vector2(-58, -38), Vector2(-34, -52), Vector2(0, -92), Vector2(34, -52), Vector2(58, -38)])
-	roof.color = Color("1E1D34")
-	n.add_child(roof)
-	# синий кант — тонкая полоса у основания крыши (поверх стыка)
-	var trim := Polygon2D.new()
-	trim.polygon = PackedVector2Array([Vector2(-32, -36), Vector2(32, -36), Vector2(32, -41), Vector2(-32, -41)])
-	trim.color = Color("4958B0")
-	n.add_child(trim)
-	# конёк
-	var top := Polygon2D.new()
-	top.polygon = PackedVector2Array([Vector2(-3, -90), Vector2(3, -90), Vector2(3, -104), Vector2(-3, -104)])
-	top.color = Color("C8324E")
-	n.add_child(top)
+	# одна крыша с загнутыми карнизами + синий кант
+	n.add_child(_pagoda_roof(-40, 58, 44, "1E1D34"))
+	n.add_child(_trim_band(-39, 30))
+	# красный конёк
+	var fin := Polygon2D.new()
+	fin.polygon = PackedVector2Array([Vector2(-3, -82), Vector2(3, -82), Vector2(3, -98), Vector2(-3, -98)])
+	fin.color = Color("C8324E")
+	n.add_child(fin)
 	return n
 
 # Палитра атмосферы по фазам (порог по счёту): рассвет→день→закат→ночь.
@@ -536,6 +554,11 @@ func _update_atmosphere() -> void:
 	var sun_x: float = cx + vw * 0.18
 	sun_node.position = Vector2(sun_x, lerp(float(a[5]), float(b[5]), f))
 	halo_node.position = sun_node.position
+
+	# Тёплый отсвет у горизонта — широкий, под цвет солнца, тает к ночи.
+	atmo_glow.scale = Vector2(maxf(BASE_W, vw) / 38.0, 7.0)
+	atmo_glow.position = Vector2(cx, 706.0 + climb * 0.16)
+	atmo_glow.modulate = Color(suncol.r, suncol.g, suncol.b, lerp(0.34, 0.10, night))
 
 	# Звёзды по всей ширине.
 	for s in atmo_stars:
