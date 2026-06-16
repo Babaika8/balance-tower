@@ -60,6 +60,7 @@ var diner_window: Node2D
 var diner_neon: Node2D
 var diner_lamp: Node2D
 var diner_clock: Node2D
+var diner_menu: Node2D
 var diner_stool: Node2D
 var diner_steam: CPUParticles2D
 
@@ -856,9 +857,9 @@ func _setup_pedestal() -> void:
 		ped.add_child(_sprite_scaled_to_width(stones_arr[0], ssize.x))
 	elif skin == 1:
 		var shadow := Polygon2D.new()
-		shadow.polygon = _ellipse_polygon(ssize.x * 0.82, 16.0, 24)
-		shadow.color = Color(0, 0, 0, 0.22)
-		shadow.position = Vector2(0, 44)
+		shadow.polygon = _ellipse_polygon(ssize.x * 0.86, 14.0, 24)
+		shadow.color = Color(0, 0, 0, 0.20)
+		shadow.position = Vector2(0, -4)
 		ped.add_child(shadow)
 		ped.add_child(_make_plate(ssize.x))
 	else:
@@ -1184,31 +1185,51 @@ func _make_pancake(size: Vector2, idx: int) -> Node2D:
 		Vector2(hw * 0.86, hh * 0.85), Vector2(hw * 0.5, hh), Vector2(-hw * 0.5, hh), Vector2(-hw * 0.86, hh * 0.85)])
 	rim.color = Color("A9692A")
 	n.add_child(rim)
-	# тонкий блик у верхнего края (а не кольцо — чтобы не было «дырки от пончика»)
-	var hi := Polygon2D.new()
-	hi.polygon = _ellipse_polygon(hw * 0.44, hh * 0.18, 16)
-	hi.position = Vector2(-hw * 0.08, -hh * 0.58)
-	hi.color = Color(1, 1, 1, 0.16)
-	n.add_child(hi)
-	# кусочек масла на каждом 3-м блине (idx) — стопка выглядит вкусной
-	if idx % 3 == 0:
+	# СИРОП: янтарная лужа на верхушке + потёки через передний край (читается как блин)
+	var syrup := Polygon2D.new()
+	syrup.polygon = _ellipse_polygon(hw * 0.82, hh * 0.64, 20)
+	syrup.position = Vector2(0, -hh * 0.22)
+	syrup.color = Color("B0651A")
+	n.add_child(syrup)
+	# потёки вниз по переднему краю (длины разные для каждого блина)
+	for d in [[-hw * 0.5, hh * 1.5], [-hw * 0.05, hh * 2.1], [hw * 0.4, hh * 1.2], [hw * 0.66, hh * 1.7]]:
+		var dx: float = d[0]
+		var dl: float = d[1] * (0.7 + 0.6 * float((idx + int(dx)) % 3) / 2.0)
+		var drip := Polygon2D.new()
+		drip.polygon = PackedVector2Array([
+			Vector2(dx - 6, -hh * 0.1), Vector2(dx + 6, -hh * 0.1),
+			Vector2(dx + 5, dl - 6), Vector2(dx, dl), Vector2(dx - 5, dl - 6)])
+		drip.color = Color("A85B12")
+		n.add_child(drip)
+	# глянец на сиропе
+	var gloss := Polygon2D.new()
+	gloss.polygon = _ellipse_polygon(hw * 0.4, hh * 0.16, 16)
+	gloss.position = Vector2(-hw * 0.12, -hh * 0.5)
+	gloss.color = Color(1, 1, 1, 0.18)
+	n.add_child(gloss)
+	# кубик масла сверху
+	if idx % 2 == 0:
 		var butter := Polygon2D.new()
-		butter.polygon = PackedVector2Array([Vector2(-14, -hh - 8), Vector2(14, -hh - 8), Vector2(11, -hh + 4), Vector2(-11, -hh + 4)])
+		butter.polygon = PackedVector2Array([Vector2(-15, -hh - 12), Vector2(15, -hh - 12), Vector2(12, -hh + 2), Vector2(-12, -hh + 2)])
 		butter.color = Color("FBE08A")
 		n.add_child(butter)
+		var bhi := Polygon2D.new()
+		bhi.polygon = PackedVector2Array([Vector2(-13, -hh - 11), Vector2(2, -hh - 11), Vector2(0, -hh - 4), Vector2(-12, -hh - 4)])
+		bhi.color = Color("FEEFB0")
+		n.add_child(bhi)
 	return n
 
 # Тарелка под нижним блином.
 func _make_plate(w: float) -> Node2D:
 	var n := Node2D.new()
 	var base := Polygon2D.new()
-	base.polygon = _ellipse_polygon(w * 0.72, 20.0, 28)
-	base.position = Vector2(0, 30)
+	base.polygon = _ellipse_polygon(w * 0.78, 18.0, 28)
+	base.position = Vector2(0, -16)   # под нижним блином (он садится на тарелку)
 	base.color = Color("E9E4DA")
 	n.add_child(base)
 	var lip := Polygon2D.new()
-	lip.polygon = _ellipse_polygon(w * 0.74, 9.0, 28)
-	lip.position = Vector2(0, 20)
+	lip.polygon = _ellipse_polygon(w * 0.80, 9.0, 28)
+	lip.position = Vector2(0, -26)
 	lip.color = Color("FBF8F2")
 	n.add_child(lip)
 	return n
@@ -1243,6 +1264,8 @@ func _setup_diner() -> void:
 	# Часы и лампа.
 	diner_clock = _diner_clock()
 	layer.add_child(diner_clock)
+	diner_menu = _diner_menu()
+	layer.add_child(diner_menu)
 	diner_lamp = _diner_lamp()
 	layer.add_child(diner_lamp)
 	# Пол в шашечку + стойка + табурет + декор.
@@ -1267,8 +1290,9 @@ func _update_diner() -> void:
 	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5
 	diner_window.position = Vector2(cx, vh * 0.27)
 	diner_neon.position = Vector2(cx, vh * 0.10)
-	diner_clock.position = Vector2(cx - vw * 0.34, vh * 0.16)
-	diner_lamp.position = Vector2(cx + vw * 0.30, 0)
+	diner_clock.position = Vector2(cx - vw * 0.36, vh * 0.12)
+	diner_menu.position = Vector2(cx + vw * 0.37, vh * 0.30)
+	diner_lamp.position = Vector2(cx + vw * 0.16, 0)
 	diner_floor.position = Vector2(cx, counter_y)
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
@@ -1295,43 +1319,92 @@ func _diner_floor() -> Node2D:
 	return n
 
 func _diner_counter() -> Node2D:
-	# Стойка: красная панель + хромированная столешница, на которой стопка.
+	# Стойка: красная панель + хромированная столешница; крупный декор по всей длине.
 	var n := Node2D.new()
 	var splash := Polygon2D.new()
-	splash.polygon = PackedVector2Array([Vector2(-1700, -8), Vector2(1700, -8), Vector2(1700, 60), Vector2(-1700, 60)])
+	splash.polygon = PackedVector2Array([Vector2(-1900, -10), Vector2(1900, -10), Vector2(1900, 90), Vector2(-1900, 90)])
 	splash.color = Color("C23B4A")
 	n.add_child(splash)
 	var top := Polygon2D.new()
-	top.polygon = PackedVector2Array([Vector2(-1700, -20), Vector2(1700, -20), Vector2(1700, -4), Vector2(-1700, -4)])
+	top.polygon = PackedVector2Array([Vector2(-1900, -26), Vector2(1900, -26), Vector2(1900, -6), Vector2(-1900, -6)])
 	top.color = Color("D8DEE3")
 	n.add_child(top)
 	var edge := Polygon2D.new()
-	edge.polygon = PackedVector2Array([Vector2(-1700, -24), Vector2(1700, -24), Vector2(1700, -18), Vector2(-1700, -18)])
+	edge.polygon = PackedVector2Array([Vector2(-1900, -32), Vector2(1900, -32), Vector2(1900, -24), Vector2(-1900, -24)])
 	edge.color = Color("9AA4AC")
 	n.add_child(edge)
-	# Декор на стойке (рядом с тарелкой): кетчуп, горчица, кофе с паром, салфетки.
-	n.add_child(_diner_bottle(-150, "C0303C"))   # кетчуп
-	n.add_child(_diner_bottle(-118, "E7B62E"))   # горчица
+	# Крупный декор, разнесён по длине (заполняет и широкий экран).
+	n.add_child(_diner_bottle(-250, "C0303C", 1.7))   # кетчуп
+	n.add_child(_diner_bottle(-205, "E7B62E", 1.7))   # горчица
+	var pie := _diner_pie(); pie.position = Vector2(-430, -26); n.add_child(pie)
 	var nap := Polygon2D.new()
-	nap.polygon = PackedVector2Array([Vector2(150, -20), Vector2(196, -20), Vector2(196, -54), Vector2(150, -54)])
+	nap.polygon = PackedVector2Array([Vector2(235, -26), Vector2(305, -26), Vector2(305, -86), Vector2(235, -86)])
 	nap.color = Color("CFD6DB")
 	n.add_child(nap)
-	var coffee := _diner_coffee()
-	coffee.position = Vector2(225, -20)
-	n.add_child(coffee)
+	var coffee := _diner_coffee(); coffee.scale = Vector2(1.6, 1.6); coffee.position = Vector2(360, -26); n.add_child(coffee)
+	var shake := _diner_milkshake(); shake.position = Vector2(520, -26); n.add_child(shake)
 	return n
 
-func _diner_bottle(x: float, col: String) -> Node2D:
+func _diner_bottle(x: float, col: String, sc: float) -> Node2D:
 	var n := Node2D.new()
-	n.position = Vector2(x, -20)
+	n.position = Vector2(x, -26); n.scale = Vector2(sc, sc)
 	var b := Polygon2D.new()
-	b.polygon = PackedVector2Array([Vector2(-9, 0), Vector2(9, 0), Vector2(7, -34), Vector2(-7, -34)])
+	b.polygon = PackedVector2Array([Vector2(-10, 0), Vector2(10, 0), Vector2(8, -38), Vector2(-8, -38)])
 	b.color = Color(col)
 	n.add_child(b)
+	var lbl := Polygon2D.new()
+	lbl.polygon = PackedVector2Array([Vector2(-8, -10), Vector2(8, -10), Vector2(8, -24), Vector2(-8, -24)])
+	lbl.color = Color("F4ECE0")
+	n.add_child(lbl)
 	var cap := Polygon2D.new()
-	cap.polygon = PackedVector2Array([Vector2(-5, -34), Vector2(5, -34), Vector2(5, -46), Vector2(-5, -46)])
+	cap.polygon = PackedVector2Array([Vector2(-5, -38), Vector2(5, -38), Vector2(5, -50), Vector2(-5, -50)])
 	cap.color = Color("2B2B33")
 	n.add_child(cap)
+	return n
+
+func _diner_milkshake() -> Node2D:
+	var n := Node2D.new()
+	var glass := Polygon2D.new()
+	glass.polygon = PackedVector2Array([Vector2(-22, 0), Vector2(22, 0), Vector2(18, -64), Vector2(-18, -64)])
+	glass.color = Color("F7EFE6")
+	n.add_child(glass)
+	var shake := Polygon2D.new()
+	shake.polygon = PackedVector2Array([Vector2(-19, -34), Vector2(19, -34), Vector2(17, -64), Vector2(-17, -64)])
+	shake.color = Color("F1A7C4")
+	n.add_child(shake)
+	var dome := Polygon2D.new()
+	dome.polygon = _ellipse_polygon(20, 14, 18); dome.position = Vector2(0, -66)
+	dome.color = Color("F7C7DC")
+	n.add_child(dome)
+	var cherry := Polygon2D.new()
+	cherry.polygon = _circle_polygon(7, 14); cherry.position = Vector2(2, -80)
+	cherry.color = Color("D7263D")
+	n.add_child(cherry)
+	var straw := Polygon2D.new()
+	straw.polygon = PackedVector2Array([Vector2(10, -70), Vector2(16, -70), Vector2(24, -110), Vector2(18, -110)])
+	straw.color = Color("E7322F")
+	n.add_child(straw)
+	return n
+
+func _diner_pie() -> Node2D:
+	# Кусок пирога под стеклянным колпаком.
+	var n := Node2D.new()
+	var plate := Polygon2D.new()
+	plate.polygon = _ellipse_polygon(54, 12, 22); plate.position = Vector2(0, -8)
+	plate.color = Color("E9E4DA")
+	n.add_child(plate)
+	var crust := Polygon2D.new()
+	crust.polygon = PackedVector2Array([Vector2(-40, -12), Vector2(40, -12), Vector2(0, -64)])
+	crust.color = Color("D79A4E")
+	n.add_child(crust)
+	var fill := Polygon2D.new()
+	fill.polygon = PackedVector2Array([Vector2(-30, -16), Vector2(30, -16), Vector2(0, -50)])
+	fill.color = Color("9C3B2E")
+	n.add_child(fill)
+	var dome := Polygon2D.new()
+	dome.polygon = PackedVector2Array([Vector2(-58, -8), Vector2(-58, -60), Vector2(0, -86), Vector2(58, -60), Vector2(58, -8)])
+	dome.color = Color(0.8, 0.9, 0.95, 0.18)
+	n.add_child(dome)
 	return n
 
 func _diner_coffee() -> Node2D:
@@ -1364,9 +1437,9 @@ func _diner_coffee() -> Node2D:
 	return n
 
 func _diner_window() -> Node2D:
-	# Окно: хром-рама, за ней ночной город + луна.
+	# Окно: хром-рама, за ней ночной город + луна. Большое — на пол-стены.
 	var n := Node2D.new()
-	var W := 360.0; var H := 200.0
+	var W := 660.0; var H := 380.0
 	var frame := Polygon2D.new()
 	frame.polygon = PackedVector2Array([Vector2(-W/2-14, -H/2-14), Vector2(W/2+14, -H/2-14), Vector2(W/2+14, H/2+14), Vector2(-W/2-14, H/2+14)])
 	frame.color = Color("B9C0C6")
@@ -1376,16 +1449,16 @@ func _diner_window() -> Node2D:
 	sky.color = Color("1E2746")
 	n.add_child(sky)
 	var moon := Polygon2D.new()
-	moon.polygon = _circle_polygon(26, 24)
-	moon.position = Vector2(W/2 - 60, -H/2 + 54)
+	moon.polygon = _circle_polygon(46, 28)
+	moon.position = Vector2(W/2 - 96, -H/2 + 92)
 	moon.color = Color("EFE9D2")
 	n.add_child(moon)
 	# силуэты домов
 	var rng := RandomNumberGenerator.new(); rng.seed = 7
 	var x := -W/2
 	while x < W/2:
-		var bw := rng.randf_range(28, 50)
-		var bh := rng.randf_range(50, 130)
+		var bw := rng.randf_range(44, 86)
+		var bh := rng.randf_range(H * 0.28, H * 0.7)
 		var b := Polygon2D.new()
 		b.polygon = PackedVector2Array([Vector2(x, H/2), Vector2(x, H/2-bh), Vector2(x+bw, H/2-bh), Vector2(x+bw, H/2)])
 		b.color = Color("2B3A63")
@@ -1412,15 +1485,15 @@ func _diner_neon() -> Node2D:
 	var n := Node2D.new()
 	var glow := Label.new()
 	glow.text = "D I N E R"
-	glow.add_theme_font_size_override("font_size", 64)
+	glow.add_theme_font_size_override("font_size", 116)
 	glow.add_theme_color_override("font_color", Color("FF7FD0", 0.35))
-	glow.position = Vector2(-150, -44)
+	glow.position = Vector2(-272, -76)
 	n.add_child(glow)
 	var lab := Label.new()
 	lab.text = "D I N E R"
-	lab.add_theme_font_size_override("font_size", 58)
+	lab.add_theme_font_size_override("font_size", 104)
 	lab.add_theme_color_override("font_color", Color("FFB3E6"))
-	lab.position = Vector2(-146, -40)
+	lab.position = Vector2(-266, -70)
 	n.add_child(lab)
 	# мигание неона
 	var tw := n.create_tween().set_loops()
@@ -1431,39 +1504,67 @@ func _diner_neon() -> Node2D:
 func _diner_clock() -> Node2D:
 	var n := Node2D.new()
 	var ring := Polygon2D.new()
-	ring.polygon = _circle_polygon(34, 28)
+	ring.polygon = _circle_polygon(54, 30)
 	ring.color = Color("E7322F")
 	n.add_child(ring)
 	var face := Polygon2D.new()
-	face.polygon = _circle_polygon(27, 28)
+	face.polygon = _circle_polygon(43, 30)
 	face.color = Color("F4EFE6")
 	n.add_child(face)
 	var hh := Polygon2D.new()
-	hh.polygon = PackedVector2Array([Vector2(-3, 4), Vector2(3, 4), Vector2(2, -16), Vector2(-2, -16)])
+	hh.polygon = PackedVector2Array([Vector2(-4, 6), Vector2(4, 6), Vector2(3, -26), Vector2(-3, -26)])
 	hh.color = Color("2B2B33")
 	n.add_child(hh)
 	var mh := Polygon2D.new()
-	mh.polygon = PackedVector2Array([Vector2(-2, 4), Vector2(2, 4), Vector2(14, -2), Vector2(12, -6)])
+	mh.polygon = PackedVector2Array([Vector2(-3, 6), Vector2(3, 6), Vector2(22, -3), Vector2(19, -9)])
 	mh.color = Color("2B2B33")
 	n.add_child(mh)
 	return n
 
 func _diner_lamp() -> Node2D:
-	# Подвесной светильник сверху.
+	# Большой подвесной светильник сверху.
 	var n := Node2D.new()
 	var cord := Polygon2D.new()
-	cord.polygon = PackedVector2Array([Vector2(-2, 0), Vector2(2, 0), Vector2(2, 70), Vector2(-2, 70)])
+	cord.polygon = PackedVector2Array([Vector2(-3, 0), Vector2(3, 0), Vector2(3, 90), Vector2(-3, 90)])
 	cord.color = Color("2B2B33")
 	n.add_child(cord)
 	var shade := Polygon2D.new()
-	shade.polygon = PackedVector2Array([Vector2(-34, 110), Vector2(34, 110), Vector2(20, 70), Vector2(-20, 70)])
+	shade.polygon = PackedVector2Array([Vector2(-58, 168), Vector2(58, 168), Vector2(32, 90), Vector2(-32, 90)])
 	shade.color = Color("E7322F")
 	n.add_child(shade)
 	var glow := Polygon2D.new()
-	glow.polygon = _ellipse_polygon(26, 10, 18)
-	glow.position = Vector2(0, 112)
+	glow.polygon = _ellipse_polygon(46, 16, 20)
+	glow.position = Vector2(0, 170)
 	glow.color = Color("FBE9A8")
 	n.add_child(glow)
+	return n
+
+func _diner_menu() -> Node2D:
+	# Доска-меню на стене (с «надписями»).
+	var n := Node2D.new()
+	var board := Polygon2D.new()
+	board.polygon = PackedVector2Array([Vector2(-110, -84), Vector2(110, -84), Vector2(110, 84), Vector2(-110, 84)])
+	board.color = Color("2B2B33")
+	n.add_child(board)
+	var frame := Polygon2D.new()
+	frame.polygon = PackedVector2Array([Vector2(-118, -92), Vector2(118, -92), Vector2(118, 92), Vector2(-118, 92)])
+	frame.color = Color("C9A24B")
+	n.add_child(frame)
+	n.move_child(frame, 0)
+	var title := Label.new()
+	title.text = "MENU"
+	title.add_theme_font_size_override("font_size", 34)
+	title.add_theme_color_override("font_color", Color("FFB3E6"))
+	title.position = Vector2(-52, -78)
+	n.add_child(title)
+	var lines := ["Pancakes  $5", "Coffee    $2", "Shake     $4", "Pie       $3"]
+	for i in range(lines.size()):
+		var l := Label.new()
+		l.text = lines[i]
+		l.add_theme_font_size_override("font_size", 20)
+		l.add_theme_color_override("font_color", Color("E9E4DA"))
+		l.position = Vector2(-96, -30 + i * 30)
+		n.add_child(l)
 	return n
 
 func _diner_stool() -> Node2D:
