@@ -193,45 +193,42 @@ func _setup_background() -> void:
 		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
 				"ny": randf_range(120, 480)})
 
-	# Большие розовые сакуры-облака на самом дальнем плане (за лесом).
-	for nx in [0.18, 0.52, 0.84]:
-		var sp := _make_sakura_puff(randf_range(1.3, 1.9))
-		layer.add_child(sp)
-		atmo_props.append({"node": sp, "nx": nx + randf_range(-0.04, 0.04), "base_y": 700.0, "factor": 0.12})
+	# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
+	# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
+	# nx у ёлок — только края (центр свободен под камни).
 
-	# Дальняя кромка леса (силуэт треугольников, как в референсе) — за дюнами.
+	# --- ДАЛЬНИЙ ПЛАН ---
+	for nx in [0.15, 0.46, 0.82]:
+		var puff := _make_sakura_puff(randf_range(1.3, 1.9))
+		layer.add_child(puff)
+		atmo_props.append({"node": puff, "nx": nx + randf_range(-0.04, 0.04), "base_y": 700.0, "factor": 0.12})
 	var forest := _make_forest_row()
 	layer.add_child(forest)
 	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
 
-	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), заметный параллакс.
-	# base_y — мировой уровень гребня; factor — скорость параллакса; shade — затемнение.
-	var dune_specs := [
-		[760.0, 36.0, 0.18, 0.00], [840.0, 52.0, 0.30, 0.10],
-		[930.0, 50.0, 0.44, 0.20], [1040.0, 46.0, 0.60, 0.30],
-	]
-	for i in range(dune_specs.size()):
-		var sp2: Array = dune_specs[i]
-		var dn := _make_dune(sp2[1], 7 + i, i * 13 + 3)
-		layer.add_child(dn)
-		atmo_dunes.append({"node": dn, "base_y": sp2[0], "factor": sp2[2], "shade": sp2[3]})
+	# --- СРЕДНИЙ ПЛАН: волны земли, между ними дома/ёлки ---
+	_add_dune(layer, 36.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
+	_add_dune(layer, 52.0, 8, 16, 840.0, 0.30, 0.10)  # волна 3
+	# мелкие краевые ёлки + ПРАВЫЙ дом — уйдут за волну 2
+	_add_fir(layer, 0.05, 880.0, 1.7, 0.40)
+	_add_fir(layer, 0.95, 900.0, 1.6, 0.40)
+	var rhouse := _make_house(1.7)
+	layer.add_child(rhouse)
+	atmo_props.append({"node": rhouse, "nx": 0.85, "base_y": 952.0, "factor": 0.44})
+	_add_dune(layer, 50.0, 9, 29, 930.0, 0.44, 0.20)  # волна 2 (перекрывает правый дом)
+	# крупные краевые ёлки + ЛЕВЫЙ дом — уйдут за волну 1 (переднюю)
+	_add_fir(layer, 0.04, 1010.0, 2.5, 0.56)
+	_add_fir(layer, 0.2, 980.0, 2.1, 0.56)
+	_add_fir(layer, 0.8, 1000.0, 2.3, 0.56)
+	_add_fir(layer, 0.97, 1040.0, 2.6, 0.56)
+	var lhouse := _make_house(2.7)
+	layer.add_child(lhouse)
+	atmo_props.append({"node": lhouse, "nx": 0.21, "base_y": 1095.0, "factor": 0.60})
+	_add_dune(layer, 46.0, 10, 42, 1040.0, 0.60, 0.30) # волна 1 (передняя, перекрывает левый дом)
 
-	# Ёлки — крупные простые тёмные треугольники, разной глубины (гиперболизировано).
-	var fir_plan := [[0.06, 840.0, 1.4, 0.24], [0.24, 930.0, 2.0, 0.40],
-			[0.46, 1030.0, 2.6, 0.56], [0.63, 900.0, 1.7, 0.34],
-			[0.9, 1060.0, 2.7, 0.58], [0.98, 940.0, 1.9, 0.40]]
-	for fp in fir_plan:
-		var fr := _make_fir(fp[2])
-		layer.add_child(fr)
-		atmo_props.append({"node": fr, "nx": fp[0], "base_y": fp[1], "factor": fp[3]})
-
-	# Дома — плоский стиль пагоды, крупные. Большой слева, поменьше справа.
-	var big := _make_house(2.6)
-	layer.add_child(big)
-	atmo_props.append({"node": big, "nx": 0.18, "base_y": 1060.0, "factor": 0.6})
-	var small := _make_house(1.5)
-	layer.add_child(small)
-	atmo_props.append({"node": small, "nx": 0.85, "base_y": 940.0, "factor": 0.42})
+	# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
+	_add_fir(layer, -0.03, 1180.0, 3.4, 0.85)
+	_add_fir(layer, 1.03, 1200.0, 3.6, 0.90)
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -270,6 +267,17 @@ func _make_dune(amp: float, step_seed: int, seed: int) -> Polygon2D:
 	var p := Polygon2D.new()
 	p.polygon = pts
 	return p
+
+# Создать дюну, добавить в слой (z = порядок) и зарегистрировать для параллакса.
+func _add_dune(layer: CanvasLayer, amp: float, step_seed: int, seed: int, base_y: float, factor: float, shade: float) -> void:
+	var dn := _make_dune(amp, step_seed, seed)
+	layer.add_child(dn)
+	atmo_dunes.append({"node": dn, "base_y": base_y, "factor": factor, "shade": shade})
+
+func _add_fir(layer: CanvasLayer, nx: float, base_y: float, scale: float, factor: float) -> void:
+	var fr := _make_fir(scale)
+	layer.add_child(fr)
+	atmo_props.append({"node": fr, "nx": nx, "base_y": base_y, "factor": factor})
 
 func _make_sakura(scale: float) -> Node2D:
 	var n := Node2D.new()
