@@ -278,11 +278,12 @@ func _setup_background() -> void:
 	petals.gravity = Vector2(-14, 26)
 	petals.initial_velocity_min = 18.0
 	petals.initial_velocity_max = 42.0
-	petals.angular_velocity_min = -90.0
-	petals.angular_velocity_max = 90.0
-	petals.scale_amount_min = 3.0
-	petals.scale_amount_max = 6.0
-	petals.color = Color("F1C7E4")
+	petals.angular_velocity_min = -120.0
+	petals.angular_velocity_max = 120.0
+	petals.scale_amount_min = 0.32
+	petals.scale_amount_max = 0.62
+	petals.texture = _tex(THEME_DIR + "petal.svg")  # цветочек 5 лепестков + серединка
+	petals.color = Color(1, 1, 1)
 	layer.add_child(petals)
 
 	# Светлячки — мерцают и плавают, видны только ночью (низ сцены).
@@ -300,19 +301,28 @@ func _setup_background() -> void:
 # Дымок из трубы дома (дети ноды дома — едут и тускнеют вместе с ним).
 func _add_chimney_smoke(house: Node2D) -> void:
 	var sm := CPUParticles2D.new()
-	sm.amount = 14
-	sm.lifetime = 3.6
+	sm.amount = 18
+	sm.lifetime = 3.8
 	sm.preprocess = 2.5
-	sm.position = Vector2(1, -98)
+	sm.position = Vector2(0, -103)   # ровно из устья трубы (конёк дома)
 	sm.direction = Vector2(0.25, -1)
-	sm.spread = 10.0
-	sm.gravity = Vector2(4, -8)
-	sm.initial_velocity_min = 4.0
-	sm.initial_velocity_max = 8.0
-	sm.scale_amount_min = 2.2
-	sm.scale_amount_max = 5.0
-	sm.color = Color(0.97, 0.95, 0.97, 0.6)
+	sm.spread = 8.0
+	sm.gravity = Vector2(3, -7)
+	sm.initial_velocity_min = 3.0
+	sm.initial_velocity_max = 7.0
+	sm.scale_amount_min = 0.25
+	sm.scale_amount_max = 0.75
+	sm.scale_amount_curve = _ramp_curve()       # растёт по мере подъёма
+	sm.texture = _tex(THEME_DIR + "smoke.svg")  # мягкий клуб, не «пузырь»
+	sm.color = Color(0.97, 0.96, 0.98, 0.5)
 	house.add_child(sm)
+
+# Кривая 0→1 (частица разрастается за время жизни — дым расходится).
+func _ramp_curve() -> Curve:
+	var c := Curve.new()
+	c.add_point(Vector2(0, 0.4))
+	c.add_point(Vector2(1, 1.0))
+	return c
 
 # Дюна: волнистый гребень вокруг y=0 (range -amp..0), залив до низа. Центрируется
 # по экрану через node.position в раскладке; ширина с запасом на любой экран.
@@ -376,28 +386,43 @@ func _make_sakura(scale: float) -> Node2D:
 func _make_fir(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	var tri := Polygon2D.new()
-	tri.polygon = PackedVector2Array([Vector2(-32, 0), Vector2(0, -140), Vector2(32, 0)])
-	tri.color = Color("28392E")  # тёмно-зелёный — чтобы не сливаться с домами
-	n.add_child(tri)
+	# Объём: левая половина — базовый цвет, правая — светлее, по центру тёмная полоса.
+	var left := Polygon2D.new()
+	left.polygon = PackedVector2Array([Vector2(-32, 0), Vector2(0, -140), Vector2(0, 0)])
+	left.color = Color("28392E")
+	n.add_child(left)
+	var right := Polygon2D.new()
+	right.polygon = PackedVector2Array([Vector2(0, 0), Vector2(0, -140), Vector2(32, 0)])
+	right.color = Color("3C5634")
+	n.add_child(right)
+	var seam := Polygon2D.new()
+	seam.polygon = PackedVector2Array([Vector2(-3, 0), Vector2(3, 0), Vector2(3, -126), Vector2(-3, -126)])
+	seam.color = Color("1A271E")
+	n.add_child(seam)
 	return n
 
 # Большая розовая сакура-«облако» для дальнего плана: пышные кластеры кругов.
+# Розовая сакура-«облако». Каждая разная: свой оттенок, ширина, число и разброс
+# комков — чтобы дальний план не выглядел клонами.
 func _make_sakura_puff(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	var base := Color("E2A4CE")
-	for c in [[0, 0, 54], [-48, 10, 42], [50, 8, 44], [-24, -34, 42], [28, -30, 40], [10, 20, 46], [-66, -2, 30], [70, -4, 30]]:
+	var bases := [Color("E2A4CE"), Color("D98FC0"), Color("E8B0D2"), Color("C99BD4"), Color("EBA6C2"), Color("DDA0D0")]
+	var base: Color = bases[randi() % bases.size()]
+	var hi := base.lightened(0.20)
+	var spread_x := randf_range(56.0, 84.0)   # ширина кроны
+	var squish := randf_range(0.7, 1.0)       # приплюснутость
+	var nb := randi_range(6, 9)
+	for i in range(nb):
 		var bl := Polygon2D.new()
-		bl.polygon = _circle_polygon(float(c[2]), 18)
-		bl.position = Vector2(c[0], c[1])
+		bl.polygon = _circle_polygon(randf_range(30.0, 52.0), 18)
+		bl.position = Vector2(randf_range(-spread_x, spread_x), randf_range(-38.0, 26.0) * squish)
 		bl.color = base
 		n.add_child(bl)
-	var hi := Color("F4CDEA")
-	for c in [[-20, -30, 28], [22, -26, 26], [0, -8, 30], [-40, 2, 20]]:
+	for i in range(randi_range(3, 5)):
 		var bl := Polygon2D.new()
-		bl.polygon = _circle_polygon(float(c[2]), 16)
-		bl.position = Vector2(c[0], c[1])
+		bl.polygon = _circle_polygon(randf_range(18.0, 30.0), 16)
+		bl.position = Vector2(randf_range(-spread_x * 0.6, spread_x * 0.6), randf_range(-34.0, 2.0) * squish)
 		bl.color = hi
 		n.add_child(bl)
 	return n
