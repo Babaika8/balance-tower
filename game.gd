@@ -193,45 +193,45 @@ func _setup_background() -> void:
 		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
 				"ny": randf_range(120, 480)})
 
+	# Большие розовые сакуры-облака на самом дальнем плане (за лесом).
+	for nx in [0.18, 0.52, 0.84]:
+		var sp := _make_sakura_puff(randf_range(1.3, 1.9))
+		layer.add_child(sp)
+		atmo_props.append({"node": sp, "nx": nx + randf_range(-0.04, 0.04), "base_y": 700.0, "factor": 0.12})
+
 	# Дальняя кромка леса (силуэт треугольников, как в референсе) — за дюнами.
 	var forest := _make_forest_row()
 	layer.add_child(forest)
-	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.016, "shade": 0.42})
+	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
 
-	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), параллакс по высоте.
+	# Дюны: несколько слоёв на всю ширину (центрируются по экрану), заметный параллакс.
 	# base_y — мировой уровень гребня; factor — скорость параллакса; shade — затемнение.
 	var dune_specs := [
-		[760.0, 36.0, 0.02, 0.00], [840.0, 52.0, 0.035, 0.10],
-		[930.0, 50.0, 0.05, 0.20], [1040.0, 46.0, 0.07, 0.30],
+		[760.0, 36.0, 0.18, 0.00], [840.0, 52.0, 0.30, 0.10],
+		[930.0, 50.0, 0.44, 0.20], [1040.0, 46.0, 0.60, 0.30],
 	]
 	for i in range(dune_specs.size()):
-		var sp: Array = dune_specs[i]
-		var dn := _make_dune(sp[1], 7 + i, i * 13 + 3)
+		var sp2: Array = dune_specs[i]
+		var dn := _make_dune(sp2[1], 7 + i, i * 13 + 3)
 		layer.add_child(dn)
-		atmo_dunes.append({"node": dn, "base_y": sp[0], "factor": sp[2], "shade": sp[3]})
+		atmo_dunes.append({"node": dn, "base_y": sp2[0], "factor": sp2[2], "shade": sp2[3]})
 
-	# Сакуры — на дальнем плане (мелкие, у дальней гряды), как в референсе.
-	for nx in [0.16, 0.34, 0.74]:
-		var sk := _make_sakura(0.62)
-		layer.add_child(sk)
-		atmo_props.append({"node": sk, "nx": nx + randf_range(-0.03, 0.03), "base_y": 770.0, "factor": 0.03})
-
-	# Ёлки — простые тёмные треугольники, разной глубины.
-	var fir_plan := [[0.08, 800.0, 0.62, 0.04], [0.27, 880.0, 0.85, 0.05],
-			[0.5, 980.0, 1.05, 0.06], [0.66, 870.0, 0.8, 0.05],
-			[0.9, 1010.0, 1.1, 0.065], [0.97, 900.0, 0.9, 0.055]]
+	# Ёлки — крупные простые тёмные треугольники, разной глубины (гиперболизировано).
+	var fir_plan := [[0.06, 840.0, 1.4, 0.24], [0.24, 930.0, 2.0, 0.40],
+			[0.46, 1030.0, 2.6, 0.56], [0.63, 900.0, 1.7, 0.34],
+			[0.9, 1060.0, 2.7, 0.58], [0.98, 940.0, 1.9, 0.40]]
 	for fp in fir_plan:
 		var fr := _make_fir(fp[2])
 		layer.add_child(fr)
 		atmo_props.append({"node": fr, "nx": fp[0], "base_y": fp[1], "factor": fp[3]})
 
-	# Дома — плоский стиль пагоды. Один большой слева, один маленький справа.
-	var big := _make_house(1.4)
+	# Дома — плоский стиль пагоды, крупные. Большой слева, поменьше справа.
+	var big := _make_house(2.6)
 	layer.add_child(big)
-	atmo_props.append({"node": big, "nx": 0.2, "base_y": 1000.0, "factor": 0.07})
-	var small := _make_house(0.7)
+	atmo_props.append({"node": big, "nx": 0.18, "base_y": 1060.0, "factor": 0.6})
+	var small := _make_house(1.5)
 	layer.add_child(small)
-	atmo_props.append({"node": small, "nx": 0.83, "base_y": 880.0, "factor": 0.05})
+	atmo_props.append({"node": small, "nx": 0.85, "base_y": 940.0, "factor": 0.42})
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
@@ -291,18 +291,34 @@ func _make_sakura(scale: float) -> Node2D:
 		n.add_child(bl)
 	return n
 
-# Ёлка — простой тёмный треугольник + маленький ствол (как в референсе).
+# Ёлка — просто тёмный треугольник, без ствола (как в референсе).
 func _make_fir(scale: float) -> Node2D:
 	var n := Node2D.new()
 	n.scale = Vector2(scale, scale)
-	var trunk := Polygon2D.new()
-	trunk.polygon = PackedVector2Array([Vector2(-5, 0), Vector2(5, 0), Vector2(5, 16), Vector2(-5, 16)])
-	trunk.color = Color("2A2440")
-	n.add_child(trunk)
 	var tri := Polygon2D.new()
-	tri.polygon = PackedVector2Array([Vector2(-30, 0), Vector2(0, -132), Vector2(30, 0)])
+	tri.polygon = PackedVector2Array([Vector2(-32, 0), Vector2(0, -140), Vector2(32, 0)])
 	tri.color = Color("2A2440")
 	n.add_child(tri)
+	return n
+
+# Большая розовая сакура-«облако» для дальнего плана: пышные кластеры кругов.
+func _make_sakura_puff(scale: float) -> Node2D:
+	var n := Node2D.new()
+	n.scale = Vector2(scale, scale)
+	var base := Color("E2A4CE")
+	for c in [[0, 0, 54], [-48, 10, 42], [50, 8, 44], [-24, -34, 42], [28, -30, 40], [10, 20, 46], [-66, -2, 30], [70, -4, 30]]:
+		var bl := Polygon2D.new()
+		bl.polygon = _circle_polygon(float(c[2]), 18)
+		bl.position = Vector2(c[0], c[1])
+		bl.color = base
+		n.add_child(bl)
+	var hi := Color("F4CDEA")
+	for c in [[-20, -30, 28], [22, -26, 26], [0, -8, 30], [-40, 2, 20]]:
+		var bl := Polygon2D.new()
+		bl.polygon = _circle_polygon(float(c[2]), 16)
+		bl.position = Vector2(c[0], c[1])
+		bl.color = hi
+		n.add_child(bl)
 	return n
 
 # Дальняя кромка леса: широкая полоса мелких треугольников (силуэт), центрируется
@@ -346,21 +362,20 @@ func _make_house(scale: float) -> Node2D:
 	door.polygon = PackedVector2Array([Vector2(-7, 0), Vector2(7, 0), Vector2(7, -24), Vector2(-7, -24)])
 	door.color = Color("C8324E")
 	n.add_child(door)
-	# синий кант под крышей
-	var trim := Polygon2D.new()
-	trim.polygon = PackedVector2Array([Vector2(-32, -42), Vector2(32, -42), Vector2(32, -48), Vector2(-32, -48)])
-	trim.color = Color("4958B0")
-	n.add_child(trim)
-	# скатная крыша с приподнятыми краями
+	# сплошная скатная крыша (низ заходит на тело — без «дыры»)
 	var roof := Polygon2D.new()
 	roof.polygon = PackedVector2Array([
-		Vector2(-54, -46), Vector2(-44, -54), Vector2(0, -86), Vector2(44, -54),
-		Vector2(54, -46), Vector2(40, -48), Vector2(0, -74), Vector2(-40, -48)])
+		Vector2(-58, -38), Vector2(-34, -52), Vector2(0, -92), Vector2(34, -52), Vector2(58, -38)])
 	roof.color = Color("1E1D34")
 	n.add_child(roof)
+	# синий кант — тонкая полоса у основания крыши (поверх стыка)
+	var trim := Polygon2D.new()
+	trim.polygon = PackedVector2Array([Vector2(-32, -36), Vector2(32, -36), Vector2(32, -41), Vector2(-32, -41)])
+	trim.color = Color("4958B0")
+	n.add_child(trim)
 	# конёк
 	var top := Polygon2D.new()
-	top.polygon = PackedVector2Array([Vector2(-3, -84), Vector2(3, -84), Vector2(3, -98), Vector2(-3, -98)])
+	top.polygon = PackedVector2Array([Vector2(-3, -90), Vector2(3, -90), Vector2(3, -104), Vector2(-3, -104)])
 	top.color = Color("C8324E")
 	n.add_child(top)
 	return n
