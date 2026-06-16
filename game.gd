@@ -54,6 +54,7 @@ var motes: CPUParticles2D
 var atmo_stars: Array = []   # {node, nx, ny}
 var atmo_dunes: Array = []   # {node, base_y, factor, shade}
 var atmo_clouds: Array = []  # {node, nx, speed, ny}
+var atmo_birds: Array = []   # {node, nx, speed, ny}
 var atmo_props: Array = []   # ёлочки/домики/сакуры: {node, nx, base_y, factor}
 
 func _ready() -> void:
@@ -186,22 +187,31 @@ func _setup_background() -> void:
 	layer.add_child(sun_node)
 
 	# Облака (плывут по небу медленно, тинт под фазу).
-	for i in range(5):
+	for i in range(8):
 		var cl := _make_cloud()
-		cl.scale = Vector2(randf_range(1.0, 1.8), randf_range(1.0, 1.8))
+		cl.scale = Vector2(randf_range(1.0, 2.0), randf_range(1.0, 2.0))
 		layer.add_child(cl)
 		atmo_clouds.append({"node": cl, "nx": randf(), "speed": randf_range(0.010, 0.020),
-				"ny": randf_range(120, 480)})
+				"ny": randf_range(100, 540)})
+
+	# Птицы — лёгкие силуэты, летят по небу (оживляют пустоту, особенно на широком).
+	for i in range(5):
+		var bird := _make_bird()
+		layer.add_child(bird)
+		atmo_birds.append({"node": bird, "nx": randf(), "speed": randf_range(0.022, 0.036),
+				"ny": randf_range(120, 460)})
 
 	# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
 	# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
 	# nx у ёлок — только края (центр свободен под камни).
 
-	# --- ДАЛЬНИЙ ПЛАН: много сакур-облаков по всей ширине ---
-	for i in range(7):
+	# --- ДАЛЬНИЙ ПЛАН: далёкие горы (за лесом) + много сакур-облаков ---
+	_add_dune(layer, 96.0, 4, 71, 706.0, 0.08, -0.24)   # дальняя гряда гор
+	_add_dune(layer, 70.0, 5, 73, 730.0, 0.11, -0.12)   # ближняя гряда
+	for i in range(9):
 		var puff := _make_sakura_puff(randf_range(1.2, 1.8))
 		layer.add_child(puff)
-		atmo_props.append({"node": puff, "nx": 0.06 + i * 0.14 + randf_range(-0.025, 0.025), "base_y": 700.0, "factor": 0.12})
+		atmo_props.append({"node": puff, "nx": 0.04 + i * 0.115 + randf_range(-0.02, 0.02), "base_y": 700.0, "factor": 0.12})
 	var forest := _make_forest_row()
 	layer.add_child(forest)
 	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.42})
@@ -209,11 +219,15 @@ func _setup_background() -> void:
 	# --- СРЕДНИЙ ПЛАН: волны земли (сглаженные гребни); дома/ёлки сидят на земле,
 	# фундамент уходит за свою волну. Дома и ёлки разнесены по X (не слипаются). ---
 	_add_dune(layer, 26.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
+	# мелкие дальние ёлки (плотность у горизонта, по бокам от центра)
+	_add_fir(layer, 0.34, 800.0, 1.1, 0.30)
+	_add_fir(layer, 0.64, 805.0, 1.2, 0.30)
 	_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.10)  # волна 3
 	# ПРАВЫЙ дом + правые краевые ёлки — фундамент за волну 2
 	var rhouse := _make_house(1.7)
 	layer.add_child(rhouse)
 	atmo_props.append({"node": rhouse, "nx": 0.70, "base_y": 905.0, "factor": 0.44})
+	_add_fir(layer, 0.80, 905.0, 1.7, 0.44)
 	_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
 	_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
 	_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.20)  # волна 2 (закрывает фундамент правого дома)
@@ -223,6 +237,7 @@ func _setup_background() -> void:
 	atmo_props.append({"node": lhouse, "nx": 0.30, "base_y": 1018.0, "factor": 0.60})
 	_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
 	_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
+	_add_fir(layer, 0.22, 1028.0, 1.8, 0.60)
 	_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.30) # волна 1 (передняя, закрывает фундамент левого дома)
 
 	# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
@@ -451,10 +466,19 @@ func _update_atmosphere() -> void:
 		cn.position = Vector2(lerp(-240.0, vw + 240.0, c["nx"]), c["ny"])
 		cn.modulate = Color(suncol.r, suncol.g, suncol.b, lerp(0.5, 0.12, night))
 
-	# Дюны: центр по экрану, цвет от фазы (дальше — светлее, ближе — темнее), параллакс.
+	# Птицы — летят по небу, темнеют силуэтом, ночью почти не видны.
+	for bd in atmo_birds:
+		bd["nx"] = fmod(bd["nx"] + bd["speed"] * dt, 1.0)
+		var bn: Node2D = bd["node"]
+		bn.position = Vector2(lerp(-120.0, vw + 120.0, bd["nx"]), bd["ny"])
+		bn.modulate.a = lerp(0.7, 0.15, night)
+
+	# Дюны/горы: центр по экрану, цвет от фазы (shade>0 темнее земли — ближе;
+	# shade<0 светлее — далёкие горы в дымке), параллакс.
 	for d in atmo_dunes:
 		var dn: Polygon2D = d["node"]
-		dn.color = ground.darkened(d["shade"])
+		var sh: float = d["shade"]
+		dn.color = ground.darkened(sh) if sh >= 0.0 else ground.lightened(-sh)
 		dn.position = Vector2(cx, d["base_y"] + climb * d["factor"])
 
 	# Объекты на лугах (ёлочки/домики/сакуры): по всей ширине, тускнеют к ночи.
