@@ -70,6 +70,8 @@ var diner_sky_rect: Polygon2D
 var diner_sun: Polygon2D
 var diner_moon: Polygon2D
 var diner_cars: Array = []   # {node, x, speed, w}
+var diner_furniture: Node2D  # столики/стулья/кабинка на полу (едут с полом)
+var diner_upper: Node2D      # верх зала: полки/рамки/гирлянда/потолок (над окном)
 var _diner_night: float = 0.0
 
 var atmo_active: bool = false
@@ -109,12 +111,14 @@ func _auto_shot() -> void:
 		carrier_dir = 0.0
 		if carrier:
 			carrier.position.x = base_x
-		# Дебаг: BT_SCORE=N — выставить высоту для превью фазы атмосферы.
+		# Дебаг: BT_SCORE=N — высота для превью фазы; BT_CLIMB=px — поднять камеру.
 		if OS.get_environment("BT_SCORE") != "":
 			score = int(OS.get_environment("BT_SCORE"))
 			_atmo_p = float(score)
 			_update_score()
-		await get_tree().create_timer(0.5).timeout
+		if OS.get_environment("BT_CLIMB") != "":
+			top_y = ground_top_y - float(OS.get_environment("BT_CLIMB"))
+		await get_tree().create_timer(1.2).timeout
 		var im0 := get_viewport().get_texture().get_image()
 		im0.save_png("/tmp/bt_shot.png")
 		get_tree().quit()
@@ -1334,6 +1338,9 @@ func _setup_diner() -> void:
 	layer.add_child(wall)
 	diner_wall = wall
 
+	# Верх зала (полки/рамки/гирлянда/потолок) — над окном, появляется при подъёме.
+	diner_upper = _diner_upper()
+	layer.add_child(diner_upper)
 	# Окно с городом (день/ночь, фонари, машины) + неон-вывеска (верх).
 	diner_window = _diner_window()
 	layer.add_child(diner_window)
@@ -1355,6 +1362,9 @@ func _setup_diner() -> void:
 	layer.add_child(diner_stool)
 	diner_counter = _diner_counter()
 	layer.add_child(diner_counter)
+	# Мебель на полу (перед стойкой) — едет вместе с полом.
+	diner_furniture = _diner_furniture()
+	layer.add_child(diner_furniture)
 
 	diner_active = true
 	_update_diner()
@@ -1374,8 +1384,8 @@ func _update_diner() -> void:
 	var far: float = climb * 0.42
 	# Экранная Y нижнего блина (мир→экран по ТЕКУЩЕЙ камере) — стойка следует за ним.
 	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5 + climb
-	diner_window.position = Vector2(cx, vh * 0.40 + far)
-	diner_neon.position = Vector2(cx, vh * 0.055 + far)
+	diner_window.position = Vector2(cx, vh * 0.42 + far)
+	diner_neon.position = Vector2(cx, vh * 0.115 + far)
 	diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.155 + far)   # слева, под счётом
 	diner_menu.position = Vector2(cx + vw * 0.33, vh * 0.155 + far)    # справа, под кнопкой
 	diner_lamp.position = Vector2(cx - vw * 0.04, far)
@@ -1384,6 +1394,11 @@ func _update_diner() -> void:
 	diner_counter.position = Vector2(cx, counter_y)
 	diner_counter.scale.x = maxf(1.0, vw / 1300.0)
 	diner_stool.position = Vector2(cx - vw * 0.44, counter_y + 16.0)
+	# Верх зала — высоко над окном: на базе за кадром, опускается при подъёме.
+	diner_upper.position = diner_window.position + Vector2(0, -510.0)
+	# Барные табуреты вдоль стойки (сиденья у кромки столешницы).
+	diner_furniture.position = Vector2(cx, counter_y - 2.0)
+	diner_furniture.scale.x = maxf(1.0, vw / 1300.0)
 
 	# Смена дня/ночи — плавный цикл по высоте башни.
 	var tn: float = 0.5 - 0.5 * cos(float(score) * 0.32)
@@ -1654,18 +1669,18 @@ func _diner_neon() -> Node2D:
 	# Неон-вывеска DINER (розовое свечение).
 	var n := Node2D.new()
 	var glow := Label.new()
-	glow.text = "D I N E R"
+	glow.text = "PANCAKES"
 	glow.add_theme_font_override("font", _bold())
-	glow.add_theme_font_size_override("font_size", 116)
+	glow.add_theme_font_size_override("font_size", 100)
 	glow.add_theme_color_override("font_color", Color("FF7FD0", 0.35))
-	glow.position = Vector2(-272, -76)
+	glow.position = Vector2(-272, -66)
 	n.add_child(glow)
 	var lab := Label.new()
-	lab.text = "D I N E R"
+	lab.text = "PANCAKES"
 	lab.add_theme_font_override("font", _bold())
-	lab.add_theme_font_size_override("font_size", 104)
+	lab.add_theme_font_size_override("font_size", 92)
 	lab.add_theme_color_override("font_color", Color("FFB3E6"))
-	lab.position = Vector2(-266, -70)
+	lab.position = Vector2(-266, -60)
 	n.add_child(lab)
 	# мигание неона
 	var tw := n.create_tween().set_loops()
@@ -1741,14 +1756,169 @@ func _diner_menu() -> Node2D:
 
 func _diner_stool() -> Node2D:
 	var n := Node2D.new()
+	var post := Polygon2D.new()
+	post.polygon = PackedVector2Array([Vector2(-6, 8), Vector2(6, 8), Vector2(6, 150), Vector2(-6, 150)])
+	post.color = Color("C7CDD2")
+	n.add_child(post)
 	var seat := Polygon2D.new()
-	seat.polygon = _ellipse_polygon(34, 12, 22)
+	seat.polygon = _ellipse_polygon(36, 13, 22)
+	seat.color = Color("2E7FB0")   # синее сиденье — видно на красной стойке
+	n.add_child(seat)
+	var shine := Polygon2D.new()
+	shine.polygon = _ellipse_polygon(16, 5, 16); shine.position = Vector2(-8, -3)
+	shine.color = Color(1, 1, 1, 0.18)
+	n.add_child(shine)
+	return n
+
+# --- Мебель: ряд барных табуретов вдоль стойки (синие сиденья — контраст к красному) ---
+func _diner_furniture() -> Node2D:
+	var n := Node2D.new()
+	for sx in [-330, -185, 185, 330]:
+		var st := _diner_stool(); st.position = Vector2(sx, 0)
+		n.add_child(st)
+	return n
+
+func _diner_booth(x: float) -> Node2D:
+	var n := Node2D.new(); n.position = Vector2(x, 0)
+	var back := Polygon2D.new()
+	back.polygon = PackedVector2Array([Vector2(-78, -20), Vector2(-78, -150), Vector2(-58, -160), Vector2(-58, -20)])
+	back.color = Color("B3303C")
+	n.add_child(back)
+	var seat := Polygon2D.new()
+	seat.polygon = PackedVector2Array([Vector2(-78, -56), Vector2(-30, -56), Vector2(-30, -20), Vector2(-78, -20)])
 	seat.color = Color("C23B4A")
 	n.add_child(seat)
-	var post := Polygon2D.new()
-	post.polygon = PackedVector2Array([Vector2(-6, 8), Vector2(6, 8), Vector2(6, 120), Vector2(-6, 120)])
-	post.color = Color("AAB2B8")
-	n.add_child(post)
+	var tleg := Polygon2D.new()
+	tleg.polygon = PackedVector2Array([Vector2(-6, -64), Vector2(6, -64), Vector2(6, 0), Vector2(-6, 0)])
+	tleg.color = Color("AAB2B8")
+	n.add_child(tleg)
+	var top := Polygon2D.new()
+	top.polygon = PackedVector2Array([Vector2(-46, -76), Vector2(46, -76), Vector2(46, -64), Vector2(-46, -64)])
+	top.color = Color("D8C39A")
+	n.add_child(top)
+	var back2 := Polygon2D.new()
+	back2.polygon = PackedVector2Array([Vector2(58, -20), Vector2(58, -160), Vector2(78, -150), Vector2(78, -20)])
+	back2.color = Color("B3303C")
+	n.add_child(back2)
+	var seat2 := Polygon2D.new()
+	seat2.polygon = PackedVector2Array([Vector2(30, -56), Vector2(78, -56), Vector2(78, -20), Vector2(30, -20)])
+	seat2.color = Color("C23B4A")
+	n.add_child(seat2)
+	return n
+
+func _diner_table(x: float) -> Node2D:
+	var n := Node2D.new(); n.position = Vector2(x, 0)
+	for cx in [-58, 58]:
+		var chair := Polygon2D.new()
+		chair.polygon = PackedVector2Array([Vector2(cx-12, -54), Vector2(cx+12, -54), Vector2(cx+12, 0), Vector2(cx-12, 0)])
+		chair.color = Color("3C3B66")
+		n.add_child(chair)
+		var bx: float = (float(cx) - 8.0) if cx < 0 else (float(cx) + 8.0)
+		var cback := Polygon2D.new()
+		cback.polygon = PackedVector2Array([Vector2(bx-4, -54), Vector2(bx-4, -104), Vector2(bx+4, -104), Vector2(bx+4, -54)])
+		cback.color = Color("33325A")
+		n.add_child(cback)
+	var leg := Polygon2D.new()
+	leg.polygon = PackedVector2Array([Vector2(-7, -70), Vector2(7, -70), Vector2(7, 0), Vector2(-7, 0)])
+	leg.color = Color("AAB2B8")
+	n.add_child(leg)
+	var top := Polygon2D.new()
+	top.polygon = _ellipse_polygon(54, 12, 24); top.position = Vector2(0, -76)
+	top.color = Color("D8C39A")
+	n.add_child(top)
+	var cup := Polygon2D.new()
+	cup.polygon = PackedVector2Array([Vector2(-10, -80), Vector2(10, -80), Vector2(8, -98), Vector2(-8, -98)])
+	cup.color = Color("F3EFE8")
+	n.add_child(cup)
+	return n
+
+# --- Верх зала: полка, рамки, гирлянда, мини-неон, потолок с лампами и вентилятором ---
+func _diner_upper() -> Node2D:
+	var n := Node2D.new()
+	# полка с бутылками сиропа и стопкой тарелок (чуть выше окна)
+	var shelf := Polygon2D.new()
+	shelf.polygon = PackedVector2Array([Vector2(-360, -54), Vector2(360, -54), Vector2(360, -42), Vector2(-360, -42)])
+	shelf.color = Color("8A6A47")
+	n.add_child(shelf)
+	for bx in [-300, -266, 250, 300]:
+		var btl := _diner_bottle(bx, "C0303C" if bx < 0 else "B0651A", 1.2)
+		btl.position.y = -54
+		n.add_child(btl)
+	for i in range(4):
+		var plate := Polygon2D.new()
+		plate.polygon = _ellipse_polygon(36, 7, 18); plate.position = Vector2(-40 + i * 4, -62 - i * 9)
+		plate.color = Color("ECE6DB")
+		n.add_child(plate)
+	# рамки с панкейками
+	for fx in [-150, 150]:
+		var fr := Polygon2D.new()
+		fr.polygon = PackedVector2Array([Vector2(fx-46, -130), Vector2(fx+46, -130), Vector2(fx+46, -210), Vector2(fx-46, -210)])
+		fr.color = Color("C9A24B")
+		n.add_child(fr)
+		var pic := Polygon2D.new()
+		pic.polygon = PackedVector2Array([Vector2(fx-38, -138), Vector2(fx+38, -138), Vector2(fx+38, -202), Vector2(fx-38, -202)])
+		pic.color = Color("F2D8B0")
+		n.add_child(pic)
+		for s in range(3):
+			var pk := Polygon2D.new()
+			pk.polygon = _ellipse_polygon(26, 7, 16); pk.position = Vector2(fx, -150 - s * 12)
+			pk.color = Color("E1A24E")
+			n.add_child(pk)
+	# гирлянда-флажки
+	var line := Polygon2D.new()
+	line.polygon = PackedVector2Array([Vector2(-360, -250), Vector2(360, -250), Vector2(360, -246), Vector2(-360, -246)])
+	line.color = Color("4A4A55")
+	n.add_child(line)
+	var fcols := ["E0414E", "39A0C8", "EBB84E", "EBE3D3"]
+	var fx2 := -340.0
+	var k := 0
+	while fx2 < 360:
+		var flag := Polygon2D.new()
+		flag.polygon = PackedVector2Array([Vector2(fx2, -246), Vector2(fx2 + 30, -246), Vector2(fx2 + 15, -222)])
+		flag.color = Color(fcols[k % fcols.size()])
+		n.add_child(flag); fx2 += 38; k += 1
+	# мини-неон HOT CAKES
+	var hot := Label.new()
+	hot.text = "HOT CAKES"
+	hot.add_theme_font_override("font", _bold())
+	hot.add_theme_font_size_override("font_size", 46)
+	hot.add_theme_color_override("font_color", Color("8AE0D0"))
+	hot.position = Vector2(-128, -330)
+	n.add_child(hot)
+	# потолочная балка + подвесные лампы
+	var beam := Polygon2D.new()
+	beam.polygon = PackedVector2Array([Vector2(-700, -470), Vector2(700, -470), Vector2(700, -450), Vector2(-700, -450)])
+	beam.color = Color("5A4636")
+	n.add_child(beam)
+	for lx in [-280, -90, 110, 300]:
+		var cord := Polygon2D.new()
+		cord.polygon = PackedVector2Array([Vector2(lx-2, -450), Vector2(lx+2, -450), Vector2(lx+2, -420), Vector2(lx-2, -420)])
+		cord.color = Color("2B2B33"); n.add_child(cord)
+		var sh := Polygon2D.new()
+		sh.polygon = PackedVector2Array([Vector2(lx-22, -396), Vector2(lx+22, -396), Vector2(lx+13, -420), Vector2(lx-13, -420)])
+		sh.color = Color("E7322F"); n.add_child(sh)
+		var gl := Polygon2D.new()
+		gl.polygon = _ellipse_polygon(16, 6, 14); gl.position = Vector2(lx, -396); gl.color = Color("FBE9A8")
+		n.add_child(gl)
+	# вентилятор
+	var fan := _diner_fan(); fan.position = Vector2(10, -452); n.add_child(fan)
+	return n
+
+func _diner_fan() -> Node2D:
+	var n := Node2D.new()
+	var blades := Node2D.new()
+	for a in [0, 90, 180, 270]:
+		var bl := Polygon2D.new()
+		bl.polygon = PackedVector2Array([Vector2(0, -6), Vector2(70, -10), Vector2(70, 10), Vector2(0, 6)])
+		bl.rotation = deg_to_rad(a)
+		bl.color = Color("3A3A44")
+		blades.add_child(bl)
+	n.add_child(blades)
+	var hub := Polygon2D.new()
+	hub.polygon = _circle_polygon(12, 16); hub.color = Color("9AA2AA")
+	n.add_child(hub)
+	var tw := blades.create_tween().set_loops()
+	tw.tween_property(blades, "rotation", TAU, 2.4).from(0.0)
 	return n
 
 func _sprite_scaled_to_width(tex: Texture2D, target_w: float) -> Sprite2D:
