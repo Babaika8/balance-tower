@@ -1344,6 +1344,7 @@ func _setup_diner() -> void:
 	diner_clock = _diner_clock()
 	layer.add_child(diner_clock)
 	diner_menu = _diner_menu()
+	diner_menu.scale = Vector2(0.66, 0.66)
 	layer.add_child(diner_menu)
 	diner_lamp = _diner_lamp()
 	layer.add_child(diner_lamp)
@@ -1366,13 +1367,18 @@ func _update_diner() -> void:
 	var vh: float = vr.y
 	var cx: float = vw / 2.0
 	var dt: float = get_process_delta_time()
-	# Экранная Y, где стоит нижний блин (мир→экран при стартовой камере).
-	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5
-	diner_window.position = Vector2(cx, vh * 0.36)
-	diner_neon.position = Vector2(cx, vh * 0.075)
-	diner_clock.position = Vector2(cx - vw * 0.43, vh * 0.085)
-	diner_menu.position = Vector2(cx - vw * 0.40, counter_y - 140.0)
-	diner_lamp.position = Vector2(cx - vw * 0.04, 0)
+	# Параллакс: стойка/пол едут вместе с башней (быстро), стена/окно/декор — медленно.
+	var climb: float = 0.0
+	if camera:
+		climb = start_cam_y - camera.position.y
+	var far: float = climb * 0.42
+	# Экранная Y нижнего блина (мир→экран по ТЕКУЩЕЙ камере) — стойка следует за ним.
+	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5 + climb
+	diner_window.position = Vector2(cx, vh * 0.40 + far)
+	diner_neon.position = Vector2(cx, vh * 0.055 + far)
+	diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.155 + far)   # слева, под счётом
+	diner_menu.position = Vector2(cx + vw * 0.33, vh * 0.155 + far)    # справа, под кнопкой
+	diner_lamp.position = Vector2(cx - vw * 0.04, far)
 	diner_floor.position = Vector2(cx, counter_y)
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
@@ -1608,7 +1614,7 @@ func _diner_window() -> Node2D:
 	var car_cols := ["E0414E", "39A0C8", "EBE3D3", "E7B62E"]
 	for i in range(3):
 		var car := _diner_car(car_cols[i % car_cols.size()])
-		var cy := road_y - 18.0 - float(i % 2) * 18.0
+		var cy := road_y + 8.0 + float(i % 2) * 16.0   # колёса на дороге, не парят
 		car.position = Vector2(0, cy)
 		n.add_child(car)
 		diner_cars.append({"node": car, "x": randf_range(-W/2, W/2), "speed": randf_range(70, 130), "w": W})
