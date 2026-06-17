@@ -1353,8 +1353,7 @@ func _setup_diner() -> void:
 	diner_menu = _diner_menu()
 	diner_menu.scale = Vector2(0.66, 0.66)
 	layer.add_child(diner_menu)
-	diner_lamp = _diner_lamp()
-	layer.add_child(diner_lamp)
+	# Постоянной лампы сверху нет — лампы на потолке (появляются при подъёме).
 	# Пол в шашечку + стойка + табурет + декор.
 	diner_floor = _diner_floor()
 	layer.add_child(diner_floor)
@@ -1388,7 +1387,6 @@ func _update_diner() -> void:
 	diner_neon.position = Vector2(cx, vh * 0.115 + far)
 	diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.155 + far)   # слева, под счётом
 	diner_menu.position = Vector2(cx + vw * 0.33, vh * 0.155 + far)    # справа, под кнопкой
-	diner_lamp.position = Vector2(cx - vw * 0.04, far)
 	diner_floor.position = Vector2(cx, counter_y)
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
@@ -1665,26 +1663,29 @@ func _diner_car(col: String) -> Node2D:
 	n.add_child(head)
 	return n
 
+# Центрированная неон-надпись: свечение делаем толстым полупрозрачным контуром
+# (а не смещённой копией), поэтому буквы «горят», а не двоятся.
+func _neon_label(txt: String, fs: int, col: Color, ow: int, oc: Color) -> Label:
+	var l := Label.new()
+	l.text = txt
+	l.add_theme_font_override("font", _bold())
+	l.add_theme_font_size_override("font_size", fs)
+	l.add_theme_color_override("font_color", col)
+	if ow > 0:
+		l.add_theme_constant_override("outline_size", ow)
+		l.add_theme_color_override("font_outline_color", oc)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	l.size = Vector2(760, float(fs) * 1.5)
+	l.position = Vector2(-380, -float(fs) * 0.75)
+	return l
+
 func _diner_neon() -> Node2D:
-	# Неон-вывеска DINER (розовое свечение).
 	var n := Node2D.new()
-	var glow := Label.new()
-	glow.text = "PANCAKES"
-	glow.add_theme_font_override("font", _bold())
-	glow.add_theme_font_size_override("font_size", 100)
-	glow.add_theme_color_override("font_color", Color("FF7FD0", 0.35))
-	glow.position = Vector2(-272, -66)
-	n.add_child(glow)
-	var lab := Label.new()
-	lab.text = "PANCAKES"
-	lab.add_theme_font_override("font", _bold())
-	lab.add_theme_font_size_override("font_size", 92)
-	lab.add_theme_color_override("font_color", Color("FFB3E6"))
-	lab.position = Vector2(-266, -60)
-	n.add_child(lab)
-	# мигание неона
+	n.add_child(_neon_label("PANCAKES", 66, Color("FF7FD0", 0.45), 30, Color("FF7FD0", 0.20)))  # ореол
+	n.add_child(_neon_label("PANCAKES", 66, Color("FFE3F5"), 10, Color("FF8AD6", 0.9)))          # яркое ядро
 	var tw := n.create_tween().set_loops()
-	tw.tween_property(n, "modulate:a", 0.78, 1.6).set_trans(Tween.TRANS_SINE)
+	tw.tween_property(n, "modulate:a", 0.82, 1.6).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(n, "modulate:a", 1.0, 1.2).set_trans(Tween.TRANS_SINE)
 	return n
 
@@ -1756,17 +1757,27 @@ func _diner_menu() -> Node2D:
 
 func _diner_stool() -> Node2D:
 	var n := Node2D.new()
+	# Длинная хром-ножка до пола (под красной панелью ~320) + опора.
 	var post := Polygon2D.new()
-	post.polygon = PackedVector2Array([Vector2(-6, 8), Vector2(6, 8), Vector2(6, 150), Vector2(-6, 150)])
+	post.polygon = PackedVector2Array([Vector2(-8, 10), Vector2(8, 10), Vector2(8, 326), Vector2(-8, 326)])
 	post.color = Color("C7CDD2")
 	n.add_child(post)
+	var foot := Polygon2D.new()
+	foot.polygon = _ellipse_polygon(26, 8, 18); foot.position = Vector2(0, 326)
+	foot.color = Color("9AA2AA")
+	n.add_child(foot)
+	# Крупное сиденье.
+	var rim := Polygon2D.new()
+	rim.polygon = _ellipse_polygon(52, 22, 24); rim.position = Vector2(0, 4)
+	rim.color = Color("1F5C84")
+	n.add_child(rim)
 	var seat := Polygon2D.new()
-	seat.polygon = _ellipse_polygon(36, 13, 22)
-	seat.color = Color("2E7FB0")   # синее сиденье — видно на красной стойке
+	seat.polygon = _ellipse_polygon(52, 20, 24)
+	seat.color = Color("2E7FB0")   # синее сиденье — контраст к красной стойке
 	n.add_child(seat)
 	var shine := Polygon2D.new()
-	shine.polygon = _ellipse_polygon(16, 5, 16); shine.position = Vector2(-8, -3)
-	shine.color = Color(1, 1, 1, 0.18)
+	shine.polygon = _ellipse_polygon(24, 8, 18); shine.position = Vector2(-12, -5)
+	shine.color = Color(1, 1, 1, 0.20)
 	n.add_child(shine)
 	return n
 
@@ -1877,13 +1888,12 @@ func _diner_upper() -> Node2D:
 		flag.polygon = PackedVector2Array([Vector2(fx2, -246), Vector2(fx2 + 30, -246), Vector2(fx2 + 15, -222)])
 		flag.color = Color(fcols[k % fcols.size()])
 		n.add_child(flag); fx2 += 38; k += 1
-	# мини-неон HOT CAKES
-	var hot := Label.new()
-	hot.text = "HOT CAKES"
-	hot.add_theme_font_override("font", _bold())
-	hot.add_theme_font_size_override("font_size", 46)
-	hot.add_theme_color_override("font_color", Color("8AE0D0"))
-	hot.position = Vector2(-128, -330)
+	# мини-неон HOT CAKES (бирюзовое свечение)
+	var hotg := _neon_label("HOT CAKES", 40, Color("57D8C2", 0.45), 22, Color("57D8C2", 0.2))
+	hotg.position.y = -350
+	n.add_child(hotg)
+	var hot := _neon_label("HOT CAKES", 40, Color("D6FFF6"), 8, Color("57D8C2", 0.9))
+	hot.position.y = -350
 	n.add_child(hot)
 	# потолочная балка + подвесные лампы
 	var beam := Polygon2D.new()
