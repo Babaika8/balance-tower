@@ -48,7 +48,7 @@ var start_cam_y: float = 0.0
 # на всю ширину — поэтому раскладку обновляем каждый кадр по реальному размеру экрана.
 # Скины: 0 — «Дзен/луг» (атмосфера по высоте), 1 — «Diner» (блинчики в закусочной).
 const SKIN_COUNT := 2
-const SKIN_NAMES := ["🌸 Дзен", "🥞 Diner"]
+const SKIN_NAMES := ["Дзен", "Diner"]
 var skin: int = 0
 var skin_button: Button
 
@@ -807,14 +807,33 @@ func _setup_ui() -> void:
 	msg_label.visible = false
 	layer.add_child(msg_label)
 
-	# Кнопка смены скина (верх-право). Тап — следующий скин, состояние сохраняется.
+	# Кнопка смены скина (верх-право), стилизованная «пилюля» под тему скина.
 	skin_button = Button.new()
 	skin_button.text = SKIN_NAMES[skin]
-	skin_button.add_theme_font_size_override("font_size", 30)
+	skin_button.add_theme_font_size_override("font_size", 34)
 	skin_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	skin_button.position = Vector2(-260, 28)
-	skin_button.custom_minimum_size = Vector2(230, 56)
+	skin_button.position = Vector2(-228, 30)
+	skin_button.custom_minimum_size = Vector2(196, 64)
 	skin_button.focus_mode = Control.FOCUS_NONE
+	skin_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# Цвета пилюли под текущий скин.
+	var fill := Color("2B2B33") if skin == 1 else Color("FBF4E8")
+	var bord := Color("FF7FD0") if skin == 1 else Color("C9A24B")
+	var fcol := Color("FFE7F6") if skin == 1 else Color("5A4326")
+	for st in ["normal", "hover", "pressed"]:
+		var sb := StyleBoxFlat.new()
+		sb.bg_color = fill.lightened(0.06) if st == "hover" else (fill.darkened(0.10) if st == "pressed" else fill)
+		sb.border_color = bord
+		sb.set_border_width_all(3)
+		sb.set_corner_radius_all(32)
+		sb.set_content_margin_all(10)
+		sb.shadow_color = Color(0, 0, 0, 0.22)
+		sb.shadow_size = 6
+		sb.shadow_offset = Vector2(0, 3)
+		skin_button.add_theme_stylebox_override(st, sb)
+	skin_button.add_theme_color_override("font_color", fcol)
+	skin_button.add_theme_color_override("font_hover_color", fcol)
+	skin_button.add_theme_color_override("font_pressed_color", fcol)
 	skin_button.pressed.connect(_switch_skin)
 	layer.add_child(skin_button)
 	_update_score()
