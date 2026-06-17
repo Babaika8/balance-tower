@@ -815,7 +815,9 @@ func _setup_ui() -> void:
 	skin_button.position = Vector2(-228, 30)
 	skin_button.custom_minimum_size = Vector2(196, 64)
 	skin_button.focus_mode = Control.FOCUS_NONE
-	skin_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	# Кнопка — только визуал; тап по её области ловим в _unhandled_input (работает
+	# и на тач, и на клик, в отличие от сигнала Button на тач-устройствах).
+	skin_button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# Цвета пилюли под текущий скин.
 	var fill := Color("2B2B33") if skin == 1 else Color("FBF4E8")
 	var bord := Color("FF7FD0") if skin == 1 else Color("C9A24B")
@@ -834,7 +836,6 @@ func _setup_ui() -> void:
 	skin_button.add_theme_color_override("font_color", fcol)
 	skin_button.add_theme_color_override("font_hover_color", fcol)
 	skin_button.add_theme_color_override("font_pressed_color", fcol)
-	skin_button.pressed.connect(_switch_skin)
 	layer.add_child(skin_button)
 	_update_score()
 
@@ -967,10 +968,11 @@ func _physics_process(_delta: float) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
 	var act := false
+	var pos := Vector2(-1, -1)
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		act = true
+		act = true; pos = event.position
 	elif event is InputEventScreenTouch and event.pressed:
-		act = true
+		act = true; pos = event.position
 	elif event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_SPACE:
 		act = true
 	if not act:
@@ -980,6 +982,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if now - last_action_ms < 200:
 		return
 	last_action_ms = now
+	# Тап по кнопке скина — переключаем скин, башню не трогаем.
+	if pos.x >= 0.0 and skin_button and skin_button.get_global_rect().has_point(pos):
+		_switch_skin()
+		return
 	if state == State.WAITING and carrier:
 		_drop()
 	elif state == State.GAME_OVER:

@@ -15,7 +15,7 @@ window/stretch/aspect="expand"
 
 [gui]
 
-theme/custom_font="res://assets/font/Baloo2.ttf"
+theme/custom_font="res://assets/font/Comfortaa.ttf"
 
 [input_devices]
 

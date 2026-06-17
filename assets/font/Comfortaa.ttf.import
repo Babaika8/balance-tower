@@ -2,13 +2,13 @@
 
 importer="font_data_dynamic"
 type="FontFile"
-uid="uid://cup5s45g1k20e"
-path="res://.godot/imported/Baloo2.ttf-5f30e2cd55ecded77c56137b11da4a18.fontdata"
+uid="uid://bcv48d4wlqttj"
+path="res://.godot/imported/Comfortaa.ttf-bb10b3143ab578964cffa1d53516afcd.fontdata"
 
 [deps]
 
-source_file="res://assets/font/Baloo2.ttf"
-dest_files=["res://.godot/imported/Baloo2.ttf-5f30e2cd55ecded77c56137b11da4a18.fontdata"]
+source_file="res://assets/font/Comfortaa.ttf"
+dest_files=["res://.godot/imported/Comfortaa.ttf-bb10b3143ab578964cffa1d53516afcd.fontdata"]
 
 [params]
 
