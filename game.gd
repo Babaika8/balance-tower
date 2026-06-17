@@ -36,6 +36,7 @@ var theme: Dictionary = {}
 var camera: Camera2D
 var score_label: Label
 var msg_label: Label
+var msg_scrim: ColorRect
 var dust: CPUParticles2D
 
 # Параллакс-слои фона: каждый {node, art_w, art_h, drift, bottom_y, sway}.
@@ -63,6 +64,13 @@ var diner_clock: Node2D
 var diner_menu: Node2D
 var diner_stool: Node2D
 var diner_steam: CPUParticles2D
+var diner_wall: CanvasItem
+var diner_neon_node: Node2D
+var diner_sky_rect: Polygon2D
+var diner_sun: Polygon2D
+var diner_moon: Polygon2D
+var diner_cars: Array = []   # {node, x, speed, w}
+var _diner_night: float = 0.0
 
 var atmo_active: bool = false
 var sky_grad: Gradient
@@ -789,27 +797,51 @@ func _setup_camera() -> void:
 	add_child(camera)
 	camera.make_current()
 
+# Жирный вариант Comfortaa (вес 700) — читаемее тонкого дефолта.
+func _bold() -> FontVariation:
+	var fv := FontVariation.new()
+	fv.base_font = load("res://assets/font/Comfortaa.ttf")
+	fv.variation_opentype = {TextServerManager.get_primary_interface().name_to_tag("wght"): 700}
+	return fv
+
 func _setup_ui() -> void:
 	var layer := CanvasLayer.new()
 	add_child(layer)
-	var txt := Color("F4ECE0") if skin == 1 else Color("4A3326")
+	var bold := _bold()
 	score_label = Label.new()
-	score_label.position = Vector2(30, 30)
-	score_label.add_theme_font_size_override("font_size", 48)
-	score_label.add_theme_color_override("font_color", txt)
+	score_label.position = Vector2(30, 26)
+	score_label.add_theme_font_override("font", bold)
+	score_label.add_theme_font_size_override("font_size", 50)
+	score_label.add_theme_color_override("font_color", Color("FFFFFF"))
+	score_label.add_theme_constant_override("outline_size", 12)
+	score_label.add_theme_color_override("font_outline_color", Color("241A12"))
 	layer.add_child(score_label)
+
+	# Затемнение под текстом гейм-овера (чтобы топ-таблица читалась).
+	msg_scrim = ColorRect.new()
+	msg_scrim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	msg_scrim.color = Color(0.06, 0.05, 0.08, 0.62)
+	msg_scrim.visible = false
+	msg_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(msg_scrim)
+
 	msg_label = Label.new()
 	msg_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	msg_label.add_theme_font_size_override("font_size", 30)
-	msg_label.add_theme_color_override("font_color", Color("F4ECE0") if skin == 1 else Color("7A2218"))
+	msg_label.add_theme_font_override("font", bold)
+	msg_label.add_theme_font_size_override("font_size", 38)
+	msg_label.add_theme_color_override("font_color", Color("FFFFFF"))
+	msg_label.add_theme_constant_override("outline_size", 10)
+	msg_label.add_theme_color_override("font_outline_color", Color("1A1410"))
+	msg_label.add_theme_constant_override("line_spacing", 8)
 	msg_label.visible = false
 	layer.add_child(msg_label)
 
 	# Кнопка смены скина (верх-право), стилизованная «пилюля» под тему скина.
 	skin_button = Button.new()
 	skin_button.text = SKIN_NAMES[skin]
+	skin_button.add_theme_font_override("font", bold)
 	skin_button.add_theme_font_size_override("font_size", 34)
 	skin_button.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	skin_button.position = Vector2(-228, 30)
@@ -1049,6 +1081,7 @@ func _game_over(at: Vector2) -> void:
 		carrier = null
 	msg_label.text = _gameover_text("")
 	msg_label.visible = true
+	msg_scrim.visible = true
 	# Веб (Telegram): отправить счёт и подтянуть топ-10.
 	if OS.has_feature("web"):
 		msg_label.text = "Башня упала!\nВысота: %d\n\nЗагружаю рекорды…" % score
@@ -1091,6 +1124,7 @@ func _restart() -> void:
 	loading_lb = false
 	top_y = ground_top_y
 	msg_label.visible = false
+	msg_scrim.visible = false
 	_update_score()
 	camera.position.y = top_y - 150.0
 	_spawn_carrier()
@@ -1171,6 +1205,8 @@ func _top_color(tex: Texture2D) -> Color:
 	return Color(0.1, 0.08, 0.15)
 
 func _pick_stone() -> int:
+	if skin == 1:
+		return randi() % 3   # тип блинчика: 0 классический, 1 шоколадный, 2 ягодный
 	var stones_arr: Array = theme.get("stones", [])
 	if stones_arr.size() > 0:
 		return randi() % stones_arr.size()
@@ -1185,63 +1221,79 @@ func _stone_visual(size: Vector2, base: Color, idx: int) -> Node2D:
 		return _sprite_scaled_to_width(stones_arr[idx], size.x)
 	return _make_rock(size, base)
 
-# Блинчик: золотистая стопкообразная лепёшка с тёмным краем, бликом и кусочком масла.
+# Блинчик 3 видов: 0 классический+клён, 1 шоколадный+сгущёнка (слева), 2 ягодный+джем.
 func _make_pancake(size: Vector2, idx: int) -> Node2D:
 	var n := Node2D.new()
 	var hw := size.x / 2.0
 	var hh := size.y / 2.0
-	# тело блина (скруглённый прямоугольник), вертикальный градиент золотистого
+	var t: int = (idx if idx >= 0 else 0) % 3
+	var body_top: Color = [Color("F0B95E"), Color("7A4A2A"), Color("EAC79C")][t]
+	var body_bot: Color = [Color("BE7C33"), Color("48291A"), Color("C68A5C")][t]
+	var rim_col: Color = [Color("A9692A"), Color("3A2113"), Color("AF7244")][t]
+	var sauce: Color = [Color("B0651A"), Color("F4ECD8"), Color("C0233A")][t]   # клён / сгущёнка / джем
+	# тело блина (скруглённый прямоугольник), вертикальный градиент
 	var poly := PackedVector2Array([
 		Vector2(-hw, -hh * 0.2), Vector2(-hw * 0.86, -hh * 0.85), Vector2(-hw * 0.5, -hh),
 		Vector2(hw * 0.5, -hh), Vector2(hw * 0.86, -hh * 0.85), Vector2(hw, -hh * 0.2),
 		Vector2(hw * 0.86, hh * 0.85), Vector2(hw * 0.5, hh), Vector2(-hw * 0.5, hh), Vector2(-hw * 0.86, hh * 0.85)])
 	var body := Polygon2D.new()
 	body.polygon = poly
-	var top := Color("F0B95E")
-	var bot := Color("BE7C33")
 	var cols := PackedColorArray()
 	for v in poly:
-		cols.append(top.lerp(bot, clampf(v.y / size.y + 0.5, 0.0, 1.0)))
+		cols.append(body_top.lerp(body_bot, clampf(v.y / size.y + 0.5, 0.0, 1.0)))
 	body.vertex_colors = cols
 	n.add_child(body)
-	# тёмный нижний край (поджарка)
 	var rim := Polygon2D.new()
 	rim.polygon = PackedVector2Array([Vector2(-hw, hh * 0.1), Vector2(hw, hh * 0.1),
 		Vector2(hw * 0.86, hh * 0.85), Vector2(hw * 0.5, hh), Vector2(-hw * 0.5, hh), Vector2(-hw * 0.86, hh * 0.85)])
-	rim.color = Color("A9692A")
+	rim.color = rim_col
 	n.add_child(rim)
-	# СИРОП: янтарная лужа на верхушке + потёки через передний край (читается как блин)
-	var syrup := Polygon2D.new()
-	syrup.polygon = _ellipse_polygon(hw * 0.82, hh * 0.64, 20)
-	syrup.position = Vector2(0, -hh * 0.22)
-	syrup.color = Color("B0651A")
-	n.add_child(syrup)
-	# потёки вниз по переднему краю (длины разные для каждого блина)
-	for d in [[-hw * 0.5, hh * 1.5], [-hw * 0.05, hh * 2.1], [hw * 0.4, hh * 1.2], [hw * 0.66, hh * 1.7]]:
+	# Лужа соуса на верхушке.
+	var pool := Polygon2D.new()
+	pool.polygon = _ellipse_polygon(hw * 0.82, hh * 0.6, 20)
+	pool.position = Vector2(0, -hh * 0.24)
+	pool.color = sauce
+	n.add_child(pool)
+	# Потёки: у шоколадного — слева (сгущёнка), у остальных — по всему переднему краю.
+	var drips: Array = (
+		[[-hw * 0.62, hh * 1.5], [-hw * 0.38, hh * 1.0], [-hw * 0.12, hh * 0.7]] if t == 1
+		else [[-hw * 0.5, hh * 1.0], [-hw * 0.05, hh * 1.4], [hw * 0.4, hh * 0.8], [hw * 0.66, hh * 1.1]])
+	for d in drips:
 		var dx: float = d[0]
 		var dl: float = d[1] * (0.7 + 0.6 * float((idx + int(dx)) % 3) / 2.0)
 		var drip := Polygon2D.new()
 		drip.polygon = PackedVector2Array([
 			Vector2(dx - 6, -hh * 0.1), Vector2(dx + 6, -hh * 0.1),
 			Vector2(dx + 5, dl - 6), Vector2(dx, dl), Vector2(dx - 5, dl - 6)])
-		drip.color = Color("A85B12")
+		drip.color = sauce
 		n.add_child(drip)
-	# глянец на сиропе
-	var gloss := Polygon2D.new()
-	gloss.polygon = _ellipse_polygon(hw * 0.4, hh * 0.16, 16)
-	gloss.position = Vector2(-hw * 0.12, -hh * 0.5)
-	gloss.color = Color(1, 1, 1, 0.18)
-	n.add_child(gloss)
-	# кубик масла сверху
-	if idx % 2 == 0:
+	# Топпинг на верхушке по типу: масло / капли шоколада / ягодка.
+	if t == 0:
 		var butter := Polygon2D.new()
 		butter.polygon = PackedVector2Array([Vector2(-15, -hh - 12), Vector2(15, -hh - 12), Vector2(12, -hh + 2), Vector2(-12, -hh + 2)])
 		butter.color = Color("FBE08A")
 		n.add_child(butter)
-		var bhi := Polygon2D.new()
-		bhi.polygon = PackedVector2Array([Vector2(-13, -hh - 11), Vector2(2, -hh - 11), Vector2(0, -hh - 4), Vector2(-12, -hh - 4)])
-		bhi.color = Color("FEEFB0")
-		n.add_child(bhi)
+	elif t == 1:
+		for cx in [-hw * 0.3, hw * 0.05, hw * 0.34]:
+			var chip := Polygon2D.new()
+			chip.polygon = _circle_polygon(5, 10); chip.position = Vector2(cx, -hh * 0.2)
+			chip.color = Color("2A160C")
+			n.add_child(chip)
+	else:
+		var berry := Polygon2D.new()
+		berry.polygon = _circle_polygon(10, 14); berry.position = Vector2(hw * 0.05, -hh - 4)
+		berry.color = Color("8E1B36")
+		n.add_child(berry)
+		var bh := Polygon2D.new()
+		bh.polygon = _circle_polygon(3.5, 10); bh.position = Vector2(hw * 0.05 - 3, -hh - 7)
+		bh.color = Color("D86A86")
+		n.add_child(bh)
+	# глянец
+	var gloss := Polygon2D.new()
+	gloss.polygon = _ellipse_polygon(hw * 0.38, hh * 0.15, 16)
+	gloss.position = Vector2(-hw * 0.12, -hh * 0.5)
+	gloss.color = Color(1, 1, 1, 0.16)
+	n.add_child(gloss)
 	return n
 
 # Тарелка под нижним блином.
@@ -1280,11 +1332,13 @@ func _setup_diner() -> void:
 	wall.stretch_mode = TextureRect.STRETCH_SCALE
 	wall.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(wall)
+	diner_wall = wall
 
-	# Окно с ночным городом + неон-вывеска (верх).
+	# Окно с городом (день/ночь, фонари, машины) + неон-вывеска (верх).
 	diner_window = _diner_window()
 	layer.add_child(diner_window)
 	diner_neon = _diner_neon()
+	diner_neon_node = diner_neon
 	layer.add_child(diner_neon)
 	# Часы и лампа.
 	diner_clock = _diner_clock()
@@ -1311,30 +1365,48 @@ func _update_diner() -> void:
 	var vw: float = vr.x
 	var vh: float = vr.y
 	var cx: float = vw / 2.0
+	var dt: float = get_process_delta_time()
 	# Экранная Y, где стоит нижний блин (мир→экран при стартовой камере).
 	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5
-	diner_window.position = Vector2(cx, vh * 0.27)
-	diner_neon.position = Vector2(cx, vh * 0.10)
-	diner_clock.position = Vector2(cx - vw * 0.36, vh * 0.12)
-	diner_menu.position = Vector2(cx + vw * 0.37, vh * 0.30)
-	diner_lamp.position = Vector2(cx + vw * 0.16, 0)
+	diner_window.position = Vector2(cx, vh * 0.36)
+	diner_neon.position = Vector2(cx, vh * 0.075)
+	diner_clock.position = Vector2(cx - vw * 0.43, vh * 0.085)
+	diner_menu.position = Vector2(cx - vw * 0.40, counter_y - 140.0)
+	diner_lamp.position = Vector2(cx - vw * 0.04, 0)
 	diner_floor.position = Vector2(cx, counter_y)
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
 	diner_counter.scale.x = maxf(1.0, vw / 1300.0)
-	diner_stool.position = Vector2(cx - vw * 0.40, counter_y + 16.0)
+	diner_stool.position = Vector2(cx - vw * 0.44, counter_y + 16.0)
+
+	# Смена дня/ночи — плавный цикл по высоте башни.
+	var tn: float = 0.5 - 0.5 * cos(float(score) * 0.32)
+	_diner_night = lerp(_diner_night, tn, 0.05)
+	diner_sky_rect.color = Color("A9D2F0").lerp(Color("1A2440"), _diner_night)
+	diner_sun.self_modulate.a = 1.0 - _diner_night
+	diner_moon.self_modulate.a = _diner_night
+	if diner_wall:
+		diner_wall.modulate = Color(1, 1, 1).lerp(Color(0.60, 0.66, 0.80), _diner_night)
+
+	# Машины едут по дороге в окне.
+	for c in diner_cars:
+		c["x"] += c["speed"] * dt
+		if c["x"] > c["w"] / 2.0 + 60.0:
+			c["x"] = -c["w"] / 2.0 - 60.0
+		var cn: Node2D = c["node"]
+		cn.position.x = c["x"]
 
 func _diner_floor() -> Node2D:
 	# Чёрно-белая шашечка от стойки вниз. Ширина клетки одинаковая (колонки ровные),
 	# высота рядов чуть растёт к низу — лёгкая перспектива.
 	var n := Node2D.new()
-	var tw := 88.0
-	var y := 0.0
-	for r in range(11):
-		var th := 22.0 + r * 5.0
-		var x := -1760.0
+	var tw := 150.0
+	var y := 300.0   # начинается ниже (под высокой красной панелью)
+	for r in range(7):
+		var th := 56.0 + r * 12.0
+		var x := -1800.0
 		var c := 0
-		while x < 1760.0:
+		while x < 1800.0:
 			var q := Polygon2D.new()
 			q.polygon = PackedVector2Array([Vector2(x, y), Vector2(x + tw, y), Vector2(x + tw, y + th), Vector2(x, y + th)])
 			q.color = Color("23222E") if (r + c) % 2 == 0 else Color("E7E1D6")
@@ -1347,9 +1419,13 @@ func _diner_counter() -> Node2D:
 	# Стойка: красная панель + хромированная столешница; крупный декор по всей длине.
 	var n := Node2D.new()
 	var splash := Polygon2D.new()
-	splash.polygon = PackedVector2Array([Vector2(-1900, -10), Vector2(1900, -10), Vector2(1900, 90), Vector2(-1900, 90)])
+	splash.polygon = PackedVector2Array([Vector2(-1900, -10), Vector2(1900, -10), Vector2(1900, 320), Vector2(-1900, 320)])
 	splash.color = Color("C23B4A")
 	n.add_child(splash)
+	var skirt := Polygon2D.new()   # тёмный кант снизу красной панели
+	skirt.polygon = PackedVector2Array([Vector2(-1900, 308), Vector2(1900, 308), Vector2(1900, 320), Vector2(-1900, 320)])
+	skirt.color = Color("9A2E3A")
+	n.add_child(skirt)
 	var top := Polygon2D.new()
 	top.polygon = PackedVector2Array([Vector2(-1900, -26), Vector2(1900, -26), Vector2(1900, -6), Vector2(-1900, -6)])
 	top.color = Color("D8DEE3")
@@ -1462,47 +1538,110 @@ func _diner_coffee() -> Node2D:
 	return n
 
 func _diner_window() -> Node2D:
-	# Окно: хром-рама, за ней ночной город + луна. Большое — на пол-стены.
+	# Большое панорамное окно: небо (день/ночь), солнце+луна, город с фонарями
+	# и едущими машинами. Низ — дорога.
 	var n := Node2D.new()
-	var W := 660.0; var H := 380.0
+	var W := 820.0; var H := 420.0
+	var road_y := H / 2 - 50.0
 	var frame := Polygon2D.new()
-	frame.polygon = PackedVector2Array([Vector2(-W/2-14, -H/2-14), Vector2(W/2+14, -H/2-14), Vector2(W/2+14, H/2+14), Vector2(-W/2-14, H/2+14)])
+	frame.polygon = PackedVector2Array([Vector2(-W/2-16, -H/2-16), Vector2(W/2+16, -H/2-16), Vector2(W/2+16, H/2+16), Vector2(-W/2-16, H/2+16)])
 	frame.color = Color("B9C0C6")
 	n.add_child(frame)
-	var sky := Polygon2D.new()
-	sky.polygon = PackedVector2Array([Vector2(-W/2, -H/2), Vector2(W/2, -H/2), Vector2(W/2, H/2), Vector2(-W/2, H/2)])
-	sky.color = Color("1E2746")
-	n.add_child(sky)
-	var moon := Polygon2D.new()
-	moon.polygon = _circle_polygon(46, 28)
-	moon.position = Vector2(W/2 - 96, -H/2 + 92)
-	moon.color = Color("EFE9D2")
-	n.add_child(moon)
+	diner_sky_rect = Polygon2D.new()
+	diner_sky_rect.polygon = PackedVector2Array([Vector2(-W/2, -H/2), Vector2(W/2, -H/2), Vector2(W/2, H/2), Vector2(-W/2, H/2)])
+	diner_sky_rect.color = Color("1E2746")
+	n.add_child(diner_sky_rect)
+	# солнце (день) и луна (ночь) — прозрачность переключается по фазе
+	diner_sun = Polygon2D.new()
+	diner_sun.polygon = _circle_polygon(52, 28)
+	diner_sun.position = Vector2(W/2 - 120, -H/2 + 96)
+	diner_sun.color = Color("FFE9A8")
+	n.add_child(diner_sun)
+	diner_moon = Polygon2D.new()
+	diner_moon.polygon = _circle_polygon(46, 28)
+	diner_moon.position = Vector2(W/2 - 120, -H/2 + 96)
+	diner_moon.color = Color("EFE9D2")
+	n.add_child(diner_moon)
 	# силуэты домов
 	var rng := RandomNumberGenerator.new(); rng.seed = 7
 	var x := -W/2
 	while x < W/2:
-		var bw := rng.randf_range(44, 86)
-		var bh := rng.randf_range(H * 0.28, H * 0.7)
+		var bw := rng.randf_range(54, 100)
+		var bh := rng.randf_range(H * 0.30, H * 0.72)
 		var b := Polygon2D.new()
-		b.polygon = PackedVector2Array([Vector2(x, H/2), Vector2(x, H/2-bh), Vector2(x+bw, H/2-bh), Vector2(x+bw, H/2)])
+		b.polygon = PackedVector2Array([Vector2(x, road_y), Vector2(x, road_y-bh), Vector2(x+bw, road_y-bh), Vector2(x+bw, road_y)])
 		b.color = Color("2B3A63")
 		n.add_child(b)
-		# окошки
-		var wy := H/2 - bh + 10
-		while wy < H/2 - 8:
-			if rng.randf() < 0.5:
+		var wy := road_y - bh + 12
+		while wy < road_y - 10:
+			if rng.randf() < 0.55:
 				var lw := Polygon2D.new()
-				lw.polygon = PackedVector2Array([Vector2(x+6, wy), Vector2(x+14, wy), Vector2(x+14, wy+8), Vector2(x+6, wy+8)])
+				lw.polygon = PackedVector2Array([Vector2(x+8, wy), Vector2(x+18, wy), Vector2(x+18, wy+10), Vector2(x+8, wy+10)])
 				lw.color = Color("F2D479")
 				n.add_child(lw)
-			wy += 18
-		x += bw + rng.randf_range(2, 8)
-	# рамные перекладины
+			wy += 22
+		x += bw + rng.randf_range(4, 12)
+	# дорога
+	var road := Polygon2D.new()
+	road.polygon = PackedVector2Array([Vector2(-W/2, road_y), Vector2(W/2, road_y), Vector2(W/2, H/2), Vector2(-W/2, H/2)])
+	road.color = Color("181C2E")
+	n.add_child(road)
+	# фонари вдоль дороги
+	for lx in [-W/2 + 70, -60.0, W/2 - 150]:
+		var post := Polygon2D.new()
+		post.polygon = PackedVector2Array([Vector2(lx-3, road_y), Vector2(lx+3, road_y), Vector2(lx+3, road_y-70), Vector2(lx-3, road_y-70)])
+		post.color = Color("3A4A6B")
+		n.add_child(post)
+		var arm := Polygon2D.new()
+		arm.polygon = PackedVector2Array([Vector2(lx, road_y-70), Vector2(lx+24, road_y-70), Vector2(lx+24, road_y-64), Vector2(lx, road_y-64)])
+		arm.color = Color("3A4A6B")
+		n.add_child(arm)
+		var bulb := Polygon2D.new()
+		bulb.polygon = _ellipse_polygon(8, 6, 14); bulb.position = Vector2(lx+24, road_y-60)
+		bulb.color = Color("FFE08A")
+		n.add_child(bulb)
+		var halo := Polygon2D.new()
+		halo.polygon = _ellipse_polygon(26, 20, 16); halo.position = Vector2(lx+24, road_y-52)
+		halo.color = Color(1, 0.88, 0.5, 0.16)
+		n.add_child(halo)
+	# машины (едут, заполняются в _update_diner)
+	var car_cols := ["E0414E", "39A0C8", "EBE3D3", "E7B62E"]
+	for i in range(3):
+		var car := _diner_car(car_cols[i % car_cols.size()])
+		var cy := road_y - 18.0 - float(i % 2) * 18.0
+		car.position = Vector2(0, cy)
+		n.add_child(car)
+		diner_cars.append({"node": car, "x": randf_range(-W/2, W/2), "speed": randf_range(70, 130), "w": W})
+	# рамные перекладины (крест)
 	var bar := Polygon2D.new()
 	bar.polygon = PackedVector2Array([Vector2(-3, -H/2), Vector2(3, -H/2), Vector2(3, H/2), Vector2(-3, H/2)])
 	bar.color = Color("B9C0C6")
 	n.add_child(bar)
+	var hbar := Polygon2D.new()
+	hbar.polygon = PackedVector2Array([Vector2(-W/2, -3), Vector2(W/2, -3), Vector2(W/2, 3), Vector2(-W/2, 3)])
+	hbar.color = Color("B9C0C6")
+	n.add_child(hbar)
+	return n
+
+func _diner_car(col: String) -> Node2D:
+	var n := Node2D.new()
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-30, 0), Vector2(-22, -12), Vector2(12, -12), Vector2(20, -22), Vector2(30, -22), Vector2(34, 0)])
+	body.color = Color(col)
+	n.add_child(body)
+	var win := Polygon2D.new()
+	win.polygon = PackedVector2Array([Vector2(-16, -12), Vector2(10, -12), Vector2(16, -20), Vector2(-14, -20)])
+	win.color = Color("2A3550")
+	n.add_child(win)
+	for wx in [-18, 22]:
+		var wheel := Polygon2D.new()
+		wheel.polygon = _circle_polygon(7, 12); wheel.position = Vector2(wx, 0)
+		wheel.color = Color("15161E")
+		n.add_child(wheel)
+	var head := Polygon2D.new()
+	head.polygon = _ellipse_polygon(5, 4, 10); head.position = Vector2(34, -6)
+	head.color = Color("FFF3C0")
+	n.add_child(head)
 	return n
 
 func _diner_neon() -> Node2D:
@@ -1510,12 +1649,14 @@ func _diner_neon() -> Node2D:
 	var n := Node2D.new()
 	var glow := Label.new()
 	glow.text = "D I N E R"
+	glow.add_theme_font_override("font", _bold())
 	glow.add_theme_font_size_override("font_size", 116)
 	glow.add_theme_color_override("font_color", Color("FF7FD0", 0.35))
 	glow.position = Vector2(-272, -76)
 	n.add_child(glow)
 	var lab := Label.new()
 	lab.text = "D I N E R"
+	lab.add_theme_font_override("font", _bold())
 	lab.add_theme_font_size_override("font_size", 104)
 	lab.add_theme_color_override("font_color", Color("FFB3E6"))
 	lab.position = Vector2(-266, -70)
