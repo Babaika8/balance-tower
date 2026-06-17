@@ -1209,21 +1209,14 @@ func _top_color(tex: Texture2D) -> Color:
 	return Color(0.1, 0.08, 0.15)
 
 func _pick_stone() -> int:
-	if skin == 1:
-		return randi() % 3   # тип блинчика: 0 классический, 1 шоколадный, 2 ягодный
-	var stones_arr: Array = theme.get("stones", [])
-	if stones_arr.size() > 0:
-		return randi() % stones_arr.size()
-	return -1
+	# Diner — тип блина (0/1/2), Дзен — тип камня (0/1/2).
+	return randi() % 3
 
-# Возвращает узел «кирпичика» башни: блинчик (Diner) или камень (Дзен).
+# Возвращает узел «кирпичика» башни: блинчик (Diner) или камень (Дзен, 3 вида).
 func _stone_visual(size: Vector2, base: Color, idx: int) -> Node2D:
 	if skin == 1:
 		return _make_pancake(size, idx)
-	var stones_arr: Array = theme.get("stones", [])
-	if idx >= 0 and idx < stones_arr.size():
-		return _sprite_scaled_to_width(stones_arr[idx], size.x)
-	return _make_rock(size, base)
+	return _make_zen_stone(size, idx)
 
 # Блинчик 3 видов: 0 классический+клён, 1 шоколадный+сгущёнка (слева), 2 ягодный+джем.
 func _make_pancake(size: Vector2, idx: int) -> Node2D:
@@ -1384,9 +1377,17 @@ func _update_diner() -> void:
 	# Экранная Y нижнего блина (мир→экран по ТЕКУЩЕЙ камере) — стойка следует за ним.
 	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5 + climb
 	diner_window.position = Vector2(cx, vh * 0.42 + far)
-	diner_neon.position = Vector2(cx, vh * 0.115 + far)
-	diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.155 + far)   # слева, под счётом
-	diner_menu.position = Vector2(cx + vw * 0.33, vh * 0.155 + far)    # справа, под кнопкой
+	# Раскладка верха зависит от ориентации: портрет — симметрично столбиком (неон,
+	# ниже часы+меню по краям); широкий — разнесено по краям, как было.
+	var portrait := vh > vw * 1.1
+	if portrait:
+		diner_neon.position = Vector2(cx, vh * 0.105 + far)
+		diner_clock.position = Vector2(cx - vw * 0.30, vh * 0.205 + far)
+		diner_menu.position = Vector2(cx + vw * 0.30, vh * 0.205 + far)
+	else:
+		diner_neon.position = Vector2(cx, vh * 0.085 + far)
+		diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.10 + far)
+		diner_menu.position = Vector2(cx + vw * 0.36, vh * 0.11 + far)
 	diner_floor.position = Vector2(cx, counter_y)
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
@@ -1951,6 +1952,52 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 		cols.append(top.lerp(bot, t))
 	p.vertex_colors = cols
 	return p
+
+# Дзен-камень 3 видов: 0 гладкий серый, 1 тёмный базальт с прожилкой, 2 песчаник с мхом.
+func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
+	var t: int = (idx if idx >= 0 else 0) % 3
+	var hw := size.x / 2.0
+	var hh := size.y / 2.0
+	var n := Node2D.new()
+	var poly := _rock_polygon(size)
+	var tops: Array = [Color("B0B6C0"), Color("5C616D"), Color("CBB892")]
+	var bots: Array = [Color("747B87"), Color("31343B"), Color("93805E")]
+	var top: Color = tops[t]
+	var bot: Color = bots[t]
+	var body := Polygon2D.new()
+	body.polygon = poly
+	var cols := PackedColorArray()
+	for v in poly:
+		cols.append(top.lerp(bot, clampf(v.y / size.y + 0.5, 0.0, 1.0)))
+	body.vertex_colors = cols
+	n.add_child(body)
+	# верхний блик
+	var hi := Polygon2D.new()
+	hi.polygon = _ellipse_polygon(hw * 0.5, hh * 0.26, 16)
+	hi.position = Vector2(-hw * 0.16, -hh * 0.42)
+	hi.color = Color(1, 1, 1, 0.16)
+	n.add_child(hi)
+	if t == 1:
+		# светлая прожилка-трещина
+		var crack := Polygon2D.new()
+		crack.polygon = PackedVector2Array([
+			Vector2(-hw * 0.5, -hh * 0.1), Vector2(-hw * 0.1, hh * 0.1), Vector2(hw * 0.3, -hh * 0.05), Vector2(hw * 0.55, hh * 0.2),
+			Vector2(hw * 0.5, hh * 0.28), Vector2(hw * 0.26, hh * 0.04), Vector2(-hw * 0.12, hh * 0.22), Vector2(-hw * 0.54, 0.0)])
+		crack.color = Color("7C828E")
+		n.add_child(crack)
+	elif t == 2:
+		# мшистая шапка сверху
+		for m in [[-hw * 0.3, -hh * 0.5, 12.0], [-hw * 0.02, -hh * 0.62, 15.0], [hw * 0.28, -hh * 0.52, 13.0], [hw * 0.5, -hh * 0.36, 10.0], [-hw * 0.55, -hh * 0.34, 9.0]]:
+			var moss := Polygon2D.new()
+			moss.polygon = _circle_polygon(float(m[2]), 12)
+			moss.position = Vector2(m[0], m[1])
+			moss.color = Color("6F8A45")
+			n.add_child(moss)
+		var moss_hi := Polygon2D.new()
+		moss_hi.polygon = _circle_polygon(7.0, 10); moss_hi.position = Vector2(-hw * 0.05, -hh * 0.6)
+		moss_hi.color = Color("8AA85C")
+		n.add_child(moss_hi)
+	return n
 
 func _add_hand_top(parent: Node, size: Vector2) -> void:
 	var hand_tex: Texture2D = theme.get("hand")
