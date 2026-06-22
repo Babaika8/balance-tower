@@ -81,9 +81,10 @@ var top_stone_x: float = 0.0          # x вершины — для бонуса
 var carrier_speed_mult: float = 1.0
 var slow_until_ms: int = 0
 var boost_btns: Array = []            # [{button, kind, cost}]
-const PERFECT_THRESH := 22.0
+const PERFECT_THRESH := 16.0
+const PERFECT_ANGLE := 0.12   # ~7°: блок должен лежать ровно, не косо
 const BOOST_LIST := [
-	{"kind": "stabil", "name": "Стабил", "cost": 40},
+	{"kind": "stabil", "name": "Заморозка", "cost": 40},
 	{"kind": "slow", "name": "Медленно", "cost": 35},
 	{"kind": "magnet", "name": "Магнит", "cost": 30},
 ]
@@ -997,11 +998,15 @@ func _arm_boost(kind: String, cost: int) -> void:
 	_save_coins()
 
 func _stabilize_tower() -> void:
+	# Выпрямляем каждый блок и держим башню застывшей ~0.7 сек (видно, что сработало).
 	for s in stones:
 		if is_instance_valid(s):
-			s.angular_velocity = 0.0
 			s.linear_velocity = Vector2.ZERO
-			s.rotation = lerp(s.rotation, 0.0, 0.6)
+			s.angular_velocity = 0.0
+			s.rotation = 0.0
+			s.freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
+			s.freeze = true
+	get_tree().create_timer(0.7).timeout.connect(_unfreeze_tower)
 	# Вспышка-кольцо по башне.
 	var ring := Polygon2D.new()
 	ring.polygon = _circle_polygon(46, 26)
@@ -1015,6 +1020,11 @@ func _stabilize_tower() -> void:
 	tw.tween_property(ring, "modulate:a", 0.0, 0.5)
 	tw.set_parallel(false)
 	tw.tween_callback(ring.queue_free)
+
+func _unfreeze_tower() -> void:
+	for s in stones:
+		if is_instance_valid(s):
+			s.freeze = false
 
 func _tint_carrier(c: Color) -> void:
 	if carrier and carrier.has_meta("rock_node"):
@@ -1235,7 +1245,8 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 	var dx: float = absf(stone.global_position.x - top_stone_x)
 	top_stone_x = stone.global_position.x
 	var reward := 1
-	if dx < PERFECT_THRESH:
+	# Perfect — только если ровно по горизонтали И не косо (по углу).
+	if dx < PERFECT_THRESH and absf(stone.rotation) < PERFECT_ANGLE:
 		reward += 5
 		_perfect_fx(stone)
 		stone.angular_velocity = 0.0          # точная укладка стабилизирует башню
