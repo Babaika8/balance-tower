@@ -83,9 +83,9 @@ var slow_until_ms: int = 0
 var boost_btns: Array = []            # [{button, kind, cost}]
 const PERFECT_THRESH := 22.0
 const BOOST_LIST := [
-	{"kind": "sticky", "name": "Липучка", "cost": 30},
-	{"kind": "slow", "name": "Медленно", "cost": 40},
-	{"kind": "wide", "name": "Шире", "cost": 50},
+	{"kind": "stabil", "name": "Стабил", "cost": 40},
+	{"kind": "slow", "name": "Медленно", "cost": 35},
+	{"kind": "magnet", "name": "Магнит", "cost": 30},
 ]
 
 var atmo_active: bool = false
@@ -983,47 +983,44 @@ func _arm_boost(kind: String, cost: int) -> void:
 	if kind == "slow":
 		coins -= cost
 		carrier_speed_mult = 0.42
-		slow_until_ms = Time.get_ticks_msec() + 9000
-	elif kind == "sticky":
-		if carrier == null or carrier.get_meta("sticky", false):
+		slow_until_ms = Time.get_ticks_msec() + 6000     # 6 сек
+	elif kind == "stabil":
+		coins -= cost
+		_stabilize_tower()                                # гасим раскачку всей башни
+	elif kind == "magnet":
+		if carrier == null or carrier.get_meta("magnet", false):
 			return
 		coins -= cost
-		carrier.set_meta("sticky", true)
-		_tint_carrier(Color("8FE3C0"))   # зеленоватая «клейкая» подсветка
-	elif kind == "wide":
-		if carrier == null or carrier.get_meta("wide", false):
-			return
-		coins -= cost
-		carrier.set_meta("wide", true)
-		_rebuild_carrier_stone()
+		carrier.set_meta("magnet", true)
+		_tint_carrier(Color("8FB7FF"))                    # голубая подсветка
 	_update_coins()
 	_save_coins()
 
-func _carrier_size() -> Vector2:
-	if carrier and carrier.get_meta("wide", false):
-		return Vector2(ssize.x * 1.7, ssize.y)
-	return ssize
+func _stabilize_tower() -> void:
+	for s in stones:
+		if is_instance_valid(s):
+			s.angular_velocity = 0.0
+			s.linear_velocity = Vector2.ZERO
+			s.rotation = lerp(s.rotation, 0.0, 0.6)
+	# Вспышка-кольцо по башне.
+	var ring := Polygon2D.new()
+	ring.polygon = _circle_polygon(46, 26)
+	ring.position = Vector2(base_x, top_y + 130.0)
+	ring.color = Color("8FB7FF", 0.5)
+	ring.z_index = 60
+	add_child(ring)
+	var tw := ring.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(ring, "scale", Vector2(6.0, 6.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ring, "modulate:a", 0.0, 0.5)
+	tw.set_parallel(false)
+	tw.tween_callback(ring.queue_free)
 
 func _tint_carrier(c: Color) -> void:
 	if carrier and carrier.has_meta("rock_node"):
 		var r = carrier.get_meta("rock_node")
 		if is_instance_valid(r):
 			r.modulate = c
-
-func _rebuild_carrier_stone() -> void:
-	if carrier == null:
-		return
-	if carrier.has_meta("rock_node"):
-		var old = carrier.get_meta("rock_node")
-		if is_instance_valid(old):
-			old.queue_free()
-	var color: Color = carrier.get_meta("stone_color")
-	var idx: int = carrier.get_meta("stone_idx")
-	var rock := _stone_visual(_carrier_size(), color, idx)
-	if carrier.get_meta("sticky", false):
-		rock.modulate = Color("8FE3C0")
-	carrier.add_child(rock)
-	carrier.set_meta("rock_node", rock)
 
 # Раскладка/состояние кнопок-помощников (снизу по центру; тусклые, если не хватает монет).
 func _update_boost_buttons() -> void:
@@ -1190,9 +1187,10 @@ func _unhandled_input(event: InputEvent) -> void:
 func _drop() -> void:
 	var color: Color = carrier.get_meta("stone_color")
 	var idx: int = carrier.get_meta("stone_idx")
-	var sticky: bool = carrier.get_meta("sticky", false)
-	var sz: Vector2 = _carrier_size()
+	var magnet: bool = carrier.get_meta("magnet", false)
 	var drop_pos: Vector2 = carrier.position
+	if magnet:
+		drop_pos.x = top_stone_x        # «Магнит» — ровно по центру вершины
 	_animate_release(carrier)
 	carrier = null
 	state = State.DROPPING
@@ -1204,19 +1202,18 @@ func _drop() -> void:
 	stone.max_contacts_reported = 4
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = sz
+	rect.size = ssize
 	shape.shape = rect
 	stone.add_child(shape)
-	stone.add_child(_stone_visual(sz, color, idx))
+	stone.add_child(_stone_visual(ssize, color, idx))
 	var mat := PhysicsMaterial.new()
-	mat.friction = 0.95 if sticky else 0.9
+	mat.friction = 0.9
 	mat.bounce = 0.0
 	stone.physics_material_override = mat
 	stone.mass = 1.0
 	stone.linear_damp = 0.3
 	stone.angular_damp = 0.4
 	stone.set_meta("placed", false)
-	stone.set_meta("sticky", sticky)
 	stone.body_entered.connect(_on_stone_contact.bind(stone))
 	add_child(stone)
 	stones.append(stone)
@@ -1246,11 +1243,6 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 	if score % 10 == 0:
 		reward += score                        # рубеж высоты
 	_award_coins(reward)
-
-	# Липучка: блок становится несокрушимой опорой.
-	if stone.get_meta("sticky", false):
-		stone.freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
-		stone.freeze = true
 
 	_update_score()
 	_puff(Vector2(stone.global_position.x, stone.global_position.y + ssize.y / 2.0))
