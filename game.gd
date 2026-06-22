@@ -74,6 +74,20 @@ var diner_furniture: Node2D  # столики/стулья/кабинка на �
 var diner_upper: Node2D      # верх зала: полки/рамки/гирлянда/потолок (над окном)
 var _diner_night: float = 0.0
 
+# --- Монеты и помощники (бусты) ---
+var coins: int = 0
+var coins_label: Label
+var top_stone_x: float = 0.0          # x вершины — для бонуса за точность
+var carrier_speed_mult: float = 1.0
+var slow_until_ms: int = 0
+var boost_btns: Array = []            # [{button, kind, cost}]
+const PERFECT_THRESH := 22.0
+const BOOST_LIST := [
+	{"kind": "sticky", "name": "Липучка", "cost": 30},
+	{"kind": "slow", "name": "Медленно", "cost": 40},
+	{"kind": "wide", "name": "Шире", "cost": 50},
+]
+
 var atmo_active: bool = false
 var sky_grad: Gradient
 var sun_node: Polygon2D
@@ -91,6 +105,7 @@ var atmo_props: Array = []   # ёлочки/домики/сакуры: {node, nx
 func _ready() -> void:
 	randomize()
 	_load_skin()
+	_load_coins()
 	_load_theme()
 	_setup_background()
 	_setup_camera()
@@ -873,7 +888,50 @@ func _setup_ui() -> void:
 	skin_button.add_theme_color_override("font_hover_color", fcol)
 	skin_button.add_theme_color_override("font_pressed_color", fcol)
 	layer.add_child(skin_button)
+
+	# Счётчик монет (под счётом высоты): золотая монетка + число.
+	var coin_icon := Polygon2D.new()
+	coin_icon.polygon = _circle_polygon(18, 20)
+	coin_icon.position = Vector2(48, 104)
+	coin_icon.color = Color("F2C84B")
+	layer.add_child(coin_icon)
+	var coin_ring := Polygon2D.new()
+	coin_ring.polygon = _circle_polygon(11, 16)
+	coin_ring.position = Vector2(48, 104)
+	coin_ring.color = Color("E0A92E")
+	layer.add_child(coin_ring)
+	coins_label = Label.new()
+	coins_label.position = Vector2(74, 82)
+	coins_label.add_theme_font_override("font", bold)
+	coins_label.add_theme_font_size_override("font_size", 36)
+	coins_label.add_theme_color_override("font_color", Color("FFE9A8"))
+	coins_label.add_theme_constant_override("outline_size", 8)
+	coins_label.add_theme_color_override("font_outline_color", Color("3A2A12"))
+	layer.add_child(coins_label)
+
+	# Три кнопки-помощника внизу (визуал; тап ловим в _unhandled_input).
+	for i in range(BOOST_LIST.size()):
+		var d: Dictionary = BOOST_LIST[i]
+		var b := Button.new()
+		b.text = "%s\n%d" % [d["name"], d["cost"]]
+		b.add_theme_font_override("font", bold)
+		b.add_theme_font_size_override("font_size", 24)
+		b.custom_minimum_size = Vector2(168, 78)
+		b.focus_mode = Control.FOCUS_NONE
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var bs := StyleBoxFlat.new()
+		bs.bg_color = Color("2B2B33", 0.82)
+		bs.border_color = Color("F2C84B")
+		bs.set_border_width_all(3)
+		bs.set_corner_radius_all(20)
+		bs.set_content_margin_all(6)
+		b.add_theme_stylebox_override("normal", bs)
+		b.add_theme_color_override("font_color", Color("FBF4E8"))
+		layer.add_child(b)
+		boost_btns.append({"button": b, "kind": d["kind"], "cost": int(d["cost"])})
+
 	_update_score()
+	_update_coins()
 
 func _switch_skin() -> void:
 	skin = (skin + 1) % SKIN_COUNT
@@ -894,6 +952,96 @@ func _load_skin() -> void:
 		var f := FileAccess.open("user://skin.dat", FileAccess.READ)
 		if f:
 			skin = clampi(f.get_8(), 0, SKIN_COUNT - 1)
+
+# ---------- Монеты ----------
+func _load_coins() -> void:
+	if OS.get_environment("BT_COINS") != "":
+		coins = int(OS.get_environment("BT_COINS"))
+		return
+	if FileAccess.file_exists("user://coins.dat"):
+		var f := FileAccess.open("user://coins.dat", FileAccess.READ)
+		if f:
+			coins = maxi(0, f.get_32())
+
+func _save_coins() -> void:
+	var f := FileAccess.open("user://coins.dat", FileAccess.WRITE)
+	if f:
+		f.store_32(coins)
+
+func _award_coins(n: int) -> void:
+	coins += n
+	_update_coins()
+
+func _update_coins() -> void:
+	if coins_label:
+		coins_label.text = str(coins)
+
+# ---------- Помощники (бусты) ----------
+func _arm_boost(kind: String, cost: int) -> void:
+	if coins < cost:
+		return
+	if kind == "slow":
+		coins -= cost
+		carrier_speed_mult = 0.42
+		slow_until_ms = Time.get_ticks_msec() + 9000
+	elif kind == "sticky":
+		if carrier == null or carrier.get_meta("sticky", false):
+			return
+		coins -= cost
+		carrier.set_meta("sticky", true)
+		_tint_carrier(Color("8FE3C0"))   # зеленоватая «клейкая» подсветка
+	elif kind == "wide":
+		if carrier == null or carrier.get_meta("wide", false):
+			return
+		coins -= cost
+		carrier.set_meta("wide", true)
+		_rebuild_carrier_stone()
+	_update_coins()
+	_save_coins()
+
+func _carrier_size() -> Vector2:
+	if carrier and carrier.get_meta("wide", false):
+		return Vector2(ssize.x * 1.7, ssize.y)
+	return ssize
+
+func _tint_carrier(c: Color) -> void:
+	if carrier and carrier.has_meta("rock_node"):
+		var r = carrier.get_meta("rock_node")
+		if is_instance_valid(r):
+			r.modulate = c
+
+func _rebuild_carrier_stone() -> void:
+	if carrier == null:
+		return
+	if carrier.has_meta("rock_node"):
+		var old = carrier.get_meta("rock_node")
+		if is_instance_valid(old):
+			old.queue_free()
+	var color: Color = carrier.get_meta("stone_color")
+	var idx: int = carrier.get_meta("stone_idx")
+	var rock := _stone_visual(_carrier_size(), color, idx)
+	if carrier.get_meta("sticky", false):
+		rock.modulate = Color("8FE3C0")
+	carrier.add_child(rock)
+	carrier.set_meta("rock_node", rock)
+
+# Раскладка/состояние кнопок-помощников (снизу по центру; тусклые, если не хватает монет).
+func _update_boost_buttons() -> void:
+	var vr: Vector2 = get_viewport().get_visible_rect().size
+	var n := boost_btns.size()
+	var step := 184.0
+	var x0 := vr.x / 2.0 - step * (n - 1) / 2.0 - 84.0
+	for i in range(n):
+		var d: Dictionary = boost_btns[i]
+		var b: Button = d["button"]
+		b.position = Vector2(x0 + i * step, vr.y - 132.0)
+		var armed := false
+		if d["kind"] == "slow":
+			armed = slow_until_ms > Time.get_ticks_msec()
+		elif carrier:
+			armed = carrier.get_meta(d["kind"], false)
+		var ok := coins >= int(d["cost"]) and state != State.GAME_OVER and not armed
+		b.modulate = Color(1, 1, 1, 1) if ok else (Color("8FE3C0") if armed else Color(1, 1, 1, 0.4))
 
 func _setup_pedestal() -> void:
 	var pedestal_y := 1000.0
@@ -928,6 +1076,7 @@ func _setup_pedestal() -> void:
 	add_child(ped)
 	ground_top_y = pedestal_y - 30.0
 	top_y = ground_top_y
+	top_stone_x = base_x
 
 func _setup_dust() -> void:
 	dust = CPUParticles2D.new()
@@ -966,8 +1115,11 @@ func _spawn_carrier() -> void:
 func _process(delta: float) -> void:
 	if loading_lb:
 		_poll_leaderboard()
+	if slow_until_ms > 0 and Time.get_ticks_msec() > slow_until_ms:
+		slow_until_ms = 0
+		carrier_speed_mult = 1.0
 	if state == State.WAITING and carrier:
-		var x := carrier.position.x + carrier_dir * CARRIER_SPEED * delta
+		var x := carrier.position.x + carrier_dir * CARRIER_SPEED * carrier_speed_mult * delta
 		if x > BASE_W - MARGIN:
 			x = BASE_W - MARGIN
 			carrier_dir = -1.0
@@ -975,6 +1127,7 @@ func _process(delta: float) -> void:
 			x = MARGIN
 			carrier_dir = 1.0
 		carrier.position.x = x
+	_update_boost_buttons()
 	if camera:
 		var target_y := top_y - 150.0
 		camera.position.y = lerp(camera.position.y, target_y, clamp(delta * 3.0, 0.0, 1.0))
@@ -1022,6 +1175,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if pos.x >= 0.0 and skin_button and skin_button.get_global_rect().has_point(pos):
 		_switch_skin()
 		return
+	# Тап по кнопке-помощнику (только в игре) — активируем, башню не трогаем.
+	if pos.x >= 0.0 and state != State.GAME_OVER:
+		for d in boost_btns:
+			var b: Button = d["button"]
+			if b.get_global_rect().has_point(pos):
+				_arm_boost(d["kind"], int(d["cost"]))
+				return
 	if state == State.WAITING and carrier:
 		_drop()
 	elif state == State.GAME_OVER:
@@ -1030,6 +1190,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _drop() -> void:
 	var color: Color = carrier.get_meta("stone_color")
 	var idx: int = carrier.get_meta("stone_idx")
+	var sticky: bool = carrier.get_meta("sticky", false)
+	var sz: Vector2 = _carrier_size()
 	var drop_pos: Vector2 = carrier.position
 	_animate_release(carrier)
 	carrier = null
@@ -1042,18 +1204,19 @@ func _drop() -> void:
 	stone.max_contacts_reported = 4
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = ssize
+	rect.size = sz
 	shape.shape = rect
 	stone.add_child(shape)
-	stone.add_child(_stone_visual(ssize, color, idx))
+	stone.add_child(_stone_visual(sz, color, idx))
 	var mat := PhysicsMaterial.new()
-	mat.friction = 0.9
+	mat.friction = 0.95 if sticky else 0.9
 	mat.bounce = 0.0
 	stone.physics_material_override = mat
 	stone.mass = 1.0
 	stone.linear_damp = 0.3
 	stone.angular_damp = 0.4
 	stone.set_meta("placed", false)
+	stone.set_meta("sticky", sticky)
 	stone.body_entered.connect(_on_stone_contact.bind(stone))
 	add_child(stone)
 	stones.append(stone)
@@ -1070,6 +1233,25 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 	if new_top < top_y:
 		top_y = new_top
 	score += 1
+
+	# Бонус за точность: близко к вершине предыдущего блока → Perfect.
+	var dx: float = absf(stone.global_position.x - top_stone_x)
+	top_stone_x = stone.global_position.x
+	var reward := 1
+	if dx < PERFECT_THRESH:
+		reward += 5
+		_perfect_fx(stone)
+		stone.angular_velocity = 0.0          # точная укладка стабилизирует башню
+		stone.rotation = lerp(stone.rotation, 0.0, 0.5)
+	if score % 10 == 0:
+		reward += score                        # рубеж высоты
+	_award_coins(reward)
+
+	# Липучка: блок становится несокрушимой опорой.
+	if stone.get_meta("sticky", false):
+		stone.freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
+		stone.freeze = true
+
 	_update_score()
 	_puff(Vector2(stone.global_position.x, stone.global_position.y + ssize.y / 2.0))
 	if stone == current_stone:
@@ -1079,6 +1261,7 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 
 func _game_over(at: Vector2) -> void:
 	state = State.GAME_OVER
+	_save_coins()
 	_puff(at)
 	if carrier:
 		carrier.queue_free()
@@ -1127,6 +1310,9 @@ func _restart() -> void:
 	score = 0
 	loading_lb = false
 	top_y = ground_top_y
+	top_stone_x = base_x
+	carrier_speed_mult = 1.0
+	slow_until_ms = 0
 	msg_label.visible = false
 	msg_scrim.visible = false
 	_update_score()
@@ -1140,6 +1326,25 @@ func _puff(at: Vector2) -> void:
 	dust.global_position = at
 	dust.restart()
 	dust.emitting = true
+
+# Сочный фидбэк за точную укладку: всплывающая надпись «Perfect! +5».
+func _perfect_fx(stone: RigidBody2D) -> void:
+	var l := Label.new()
+	l.text = "Perfect! +5"
+	l.add_theme_font_override("font", _bold())
+	l.add_theme_font_size_override("font_size", 42)
+	l.add_theme_color_override("font_color", Color("FFE9A8"))
+	l.add_theme_constant_override("outline_size", 8)
+	l.add_theme_color_override("font_outline_color", Color("3A2A12"))
+	l.z_index = 60
+	l.position = stone.global_position + Vector2(-104, -56)
+	add_child(l)
+	var tw := l.create_tween()
+	tw.set_parallel(true)
+	tw.tween_property(l, "position:y", l.position.y - 80.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(l, "modulate:a", 0.0, 0.8).set_delay(0.2)
+	tw.set_parallel(false)
+	tw.tween_callback(l.queue_free)
 
 func _animate_release(c: Node2D) -> void:
 	var rock = c.get_meta("rock_node")
