@@ -1347,11 +1347,9 @@ func _setup_diner() -> void:
 	diner_menu.scale = Vector2(0.66, 0.66)
 	layer.add_child(diner_menu)
 	# Постоянной лампы сверху нет — лампы на потолке (появляются при подъёме).
-	# Пол в шашечку + стойка + табурет + декор.
+	# Пол в шашечку + стойка + декор (табуреты — в _diner_furniture).
 	diner_floor = _diner_floor()
 	layer.add_child(diner_floor)
-	diner_stool = _diner_stool()
-	layer.add_child(diner_stool)
 	diner_counter = _diner_counter()
 	layer.add_child(diner_counter)
 	# Мебель на полу (перед стойкой) — едет вместе с полом.
@@ -1376,14 +1374,14 @@ func _update_diner() -> void:
 	var far: float = climb * 0.42
 	# Экранная Y нижнего блина (мир→экран по ТЕКУЩЕЙ камере) — стойка следует за ним.
 	var counter_y: float = (965.0 - start_cam_y) + vh * 0.5 + climb
-	diner_window.position = Vector2(cx, vh * 0.42 + far)
+	diner_window.position = Vector2(cx, vh * 0.40 + far)
 	# Раскладка верха зависит от ориентации: портрет — симметрично столбиком (неон,
 	# ниже часы+меню по краям); широкий — разнесено по краям, как было.
 	var portrait := vh > vw * 1.1
 	if portrait:
-		diner_neon.position = Vector2(cx, vh * 0.105 + far)
-		diner_clock.position = Vector2(cx - vw * 0.30, vh * 0.205 + far)
-		diner_menu.position = Vector2(cx + vw * 0.30, vh * 0.205 + far)
+		diner_neon.position = Vector2(cx, vh * 0.10 + far)
+		diner_clock.position = Vector2(cx - vw * 0.30, vh * 0.175 + far)
+		diner_menu.position = Vector2(cx + vw * 0.30, vh * 0.175 + far)
 	else:
 		diner_neon.position = Vector2(cx, vh * 0.085 + far)
 		diner_clock.position = Vector2(cx - vw * 0.42, vh * 0.10 + far)
@@ -1392,7 +1390,6 @@ func _update_diner() -> void:
 	diner_floor.scale.x = maxf(1.0, vw / 1400.0)
 	diner_counter.position = Vector2(cx, counter_y)
 	diner_counter.scale.x = maxf(1.0, vw / 1300.0)
-	diner_stool.position = Vector2(cx - vw * 0.44, counter_y + 16.0)
 	# Верх зала — высоко над окном: на базе за кадром, опускается при подъёме.
 	diner_upper.position = diner_window.position + Vector2(0, -510.0)
 	# Барные табуреты вдоль стойки (сиденья у кромки столешницы).
@@ -1561,8 +1558,8 @@ func _diner_window() -> Node2D:
 	# Большое панорамное окно: небо (день/ночь), солнце+луна, город с фонарями
 	# и едущими машинами. Низ — дорога.
 	var n := Node2D.new()
-	var W := 820.0; var H := 420.0
-	var road_y := H / 2 - 50.0
+	var W := 820.0; var H := 392.0
+	var road_y := H / 2 - 48.0
 	var frame := Polygon2D.new()
 	frame.polygon = PackedVector2Array([Vector2(-W/2-16, -H/2-16), Vector2(W/2+16, -H/2-16), Vector2(W/2+16, H/2+16), Vector2(-W/2-16, H/2+16)])
 	frame.color = Color("B9C0C6")
