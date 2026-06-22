@@ -77,7 +77,7 @@ var _diner_night: float = 0.0
 # --- Монеты и помощники (бусты) ---
 var coins: int = 0
 var coins_label: Label
-var top_stone_x: float = 0.0          # x вершины — для бонуса за точность
+var last_placed: RigidBody2D = null   # предыдущий уложенный блок (для Perfect/Магнита)
 var carrier_speed_mult: float = 1.0
 var slow_until_ms: int = 0
 var boost_btns: Array = []            # [{button, kind, cost}]
@@ -998,7 +998,7 @@ func _arm_boost(kind: String, cost: int) -> void:
 	_save_coins()
 
 func _stabilize_tower() -> void:
-	# Выпрямляем каждый блок и держим башню застывшей ~0.7 сек (видно, что сработало).
+	# Выпрямляем каждый блок, подсвечиваем голубым и держим башню застывшей 1 сек.
 	for s in stones:
 		if is_instance_valid(s):
 			s.linear_velocity = Vector2.ZERO
@@ -1006,18 +1006,19 @@ func _stabilize_tower() -> void:
 			s.rotation = 0.0
 			s.freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
 			s.freeze = true
-	get_tree().create_timer(0.7).timeout.connect(_unfreeze_tower)
-	# Вспышка-кольцо по башне.
+			s.modulate = Color("9FCBFF")          # «заморожено» — голубая подсветка
+	get_tree().create_timer(1.0).timeout.connect(_unfreeze_tower)
+	# Большая вспышка-кольцо по башне.
 	var ring := Polygon2D.new()
-	ring.polygon = _circle_polygon(46, 26)
-	ring.position = Vector2(base_x, top_y + 130.0)
-	ring.color = Color("8FB7FF", 0.5)
+	ring.polygon = _circle_polygon(70, 28)
+	ring.position = Vector2(base_x, top_y + 120.0)
+	ring.color = Color("AEDBFF", 0.6)
 	ring.z_index = 60
 	add_child(ring)
 	var tw := ring.create_tween()
 	tw.set_parallel(true)
-	tw.tween_property(ring, "scale", Vector2(6.0, 6.0), 0.5).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(ring, "modulate:a", 0.0, 0.5)
+	tw.tween_property(ring, "scale", Vector2(9.0, 9.0), 0.6).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tw.tween_property(ring, "modulate:a", 0.0, 0.6)
 	tw.set_parallel(false)
 	tw.tween_callback(ring.queue_free)
 
@@ -1025,6 +1026,7 @@ func _unfreeze_tower() -> void:
 	for s in stones:
 		if is_instance_valid(s):
 			s.freeze = false
+			s.modulate = Color(1, 1, 1)
 
 func _tint_carrier(c: Color) -> void:
 	if carrier and carrier.has_meta("rock_node"):
@@ -1083,7 +1085,7 @@ func _setup_pedestal() -> void:
 	add_child(ped)
 	ground_top_y = pedestal_y - 30.0
 	top_y = ground_top_y
-	top_stone_x = base_x
+	last_placed = null
 
 func _setup_dust() -> void:
 	dust = CPUParticles2D.new()
@@ -1199,8 +1201,8 @@ func _drop() -> void:
 	var idx: int = carrier.get_meta("stone_idx")
 	var magnet: bool = carrier.get_meta("magnet", false)
 	var drop_pos: Vector2 = carrier.position
-	if magnet:
-		drop_pos.x = top_stone_x        # «Магнит» — ровно по центру вершины
+	if magnet:                          # «Магнит» — ровно над блоком под ним
+		drop_pos.x = last_placed.global_position.x if is_instance_valid(last_placed) else base_x
 	_animate_release(carrier)
 	carrier = null
 	state = State.DROPPING
@@ -1240,20 +1242,15 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 	if new_top < top_y:
 		top_y = new_top
 	score += 1
-
-	# Бонус за точность: близко к вершине предыдущего блока → Perfect.
-	var dx: float = absf(stone.global_position.x - top_stone_x)
-	top_stone_x = stone.global_position.x
+	# Базовая награда сразу; Perfect — после того как блок уляжется (через 0.35с),
+	# чтобы не присуждать за «момент касания», если блок потом сполз.
+	var below := last_placed
+	last_placed = stone
 	var reward := 1
-	# Perfect — только если ровно по горизонтали И не косо (по углу).
-	if dx < PERFECT_THRESH and absf(stone.rotation) < PERFECT_ANGLE:
-		reward += 5
-		_perfect_fx(stone)
-		stone.angular_velocity = 0.0          # точная укладка стабилизирует башню
-		stone.rotation = lerp(stone.rotation, 0.0, 0.5)
 	if score % 10 == 0:
 		reward += score                        # рубеж высоты
 	_award_coins(reward)
+	get_tree().create_timer(0.35).timeout.connect(_check_perfect.bind(stone, below))
 
 	_update_score()
 	_puff(Vector2(stone.global_position.x, stone.global_position.y + ssize.y / 2.0))
@@ -1313,7 +1310,7 @@ func _restart() -> void:
 	score = 0
 	loading_lb = false
 	top_y = ground_top_y
-	top_stone_x = base_x
+	last_placed = null
 	carrier_speed_mult = 1.0
 	slow_until_ms = 0
 	msg_label.visible = false
@@ -1348,6 +1345,17 @@ func _perfect_fx(stone: RigidBody2D) -> void:
 	tw.tween_property(l, "modulate:a", 0.0, 0.8).set_delay(0.2)
 	tw.set_parallel(false)
 	tw.tween_callback(l.queue_free)
+
+# Честная проверка Perfect — когда блок уже улёгся: сравниваем с блоком ПОД ним.
+func _check_perfect(stone: RigidBody2D, below: RigidBody2D) -> void:
+	if state == State.GAME_OVER or not is_instance_valid(stone) or not stone.get_meta("placed", false):
+		return
+	var ref_x: float = below.global_position.x if is_instance_valid(below) else base_x
+	if absf(stone.global_position.x - ref_x) < PERFECT_THRESH and absf(stone.rotation) < PERFECT_ANGLE:
+		_award_coins(5)
+		_perfect_fx(stone)
+		stone.angular_velocity = 0.0
+		stone.rotation = lerp(stone.rotation, 0.0, 0.4)
 
 func _animate_release(c: Node2D) -> void:
 	var rock = c.get_meta("rock_node")
