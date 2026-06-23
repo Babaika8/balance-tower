@@ -22,3 +22,10 @@ vector references, not freehand. SVG imports as crisp Texture2D, tiny.
 
 ## Secrets
 NEVER commit secrets. Bot token is a Cloudflare Worker secret, never in repo.
+
+## Публикация в Telegram (одна команда)
+Godot установлен на сервере, поэтому сборку+деплой можно делать прямо там:
+- `bash tools/deploy.sh` — собирает веб-экспорт и force-push в `gh-pages` →
+  через ~1-2 мин обновляется https://babaika8.github.io/balance-tower/ (и в Telegram).
+- `bash tools/deploy.sh --dry-run` — собрать и проверить без публикации.
+Деплой меняет ЖИВОЙ сайт — публикуй только когда правка готова.
