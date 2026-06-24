@@ -2309,7 +2309,7 @@ func _update_airport() -> void:
 	airport_travelator.position = Vector2(cx, counter_y + 150.0)
 	airport_travelator.scale.x = maxf(1.0, vw / 1300.0)
 	# Верх зала — над окном, опускается при подъёме (ниже HUD, чтобы не налезал).
-	airport_upper.position = airport_window.position + Vector2(0, -430.0)
+	airport_upper.position = airport_window.position + Vector2(0, -452.0)
 
 	# Смена дня/ночи — плавный цикл по высоте башни (как в Diner).
 	var tn: float = 0.5 - 0.5 * cos(float(score) * 0.32)
@@ -2343,15 +2343,16 @@ func _update_airport() -> void:
 		hn.position.x = h["x"]
 
 func _airport_floor() -> Node2D:
-	# Светлая керамическая плитка с тёмными швами; ряды чуть растут к низу (перспектива).
+	# Керамическая плитка от низа окна вниз до самого края экрана — без пустых серых
+	# зон. Зал/травалатор/тележка ложатся поверх. Плитка мелкая, ряды чуть растут к низу.
 	var n := Node2D.new()
-	var tw := 92.0
-	var y := 300.0
-	for r in range(11):
-		var th := 34.0 + r * 6.0
-		var x := -1800.0
+	var tw := 88.0
+	var y := -40.0
+	for r in range(20):
+		var th := 30.0 + r * 3.0
+		var x := -1900.0
 		var c := 0
-		while x < 1800.0:
+		while x < 1900.0:
 			var q := Polygon2D.new()
 			q.polygon = PackedVector2Array([Vector2(x + 1.5, y + 1.5), Vector2(x + tw - 1.5, y + 1.5), Vector2(x + tw - 1.5, y + th - 1.5), Vector2(x + 1.5, y + th - 1.5)])
 			q.color = Color("DCE3E9") if (r + c) % 2 == 0 else Color("CAD2DA")
@@ -2364,7 +2365,7 @@ func _airport_window() -> Node2D:
 	# Большое панорамное окно на лётное поле — НЕ как в Diner: широкое поле,
 	# диспетчерская вышка, перрон, рулящие самолёты, ночные огни.
 	var n := Node2D.new()
-	var W := 1040.0; var H := 470.0
+	var W := 1240.0; var H := 480.0
 	var apron_y := -H / 2 + H * 0.46   # горизонт повыше → больше неба и перрона
 	# наружная рама (тонкая, без креста-перекладин, чтобы не повторять Diner)
 	var frame := Polygon2D.new()
@@ -2397,22 +2398,22 @@ func _airport_window() -> Node2D:
 		strip.polygon = PackedVector2Array([Vector2(bx+6, apron_y-bh+14), Vector2(bx+bw-6, apron_y-bh+14), Vector2(bx+bw-6, apron_y-bh+30), Vector2(bx+6, apron_y-bh+30)])
 		strip.color = Color("AEC6DC")
 		n.add_child(strip)
-	# Диспетчерская вышка (крупный узнаваемый силуэт, ближе к центру — видно в портрете).
-	var tower_x := -W/2 + 300.0
+	# Диспетчерская вышка (компактная, целиком внутри окна, не торчит за рамку).
+	var tower_x := -W/2 + 340.0
 	var mast := Polygon2D.new()
-	mast.polygon = PackedVector2Array([Vector2(tower_x-13, apron_y), Vector2(tower_x+13, apron_y), Vector2(tower_x+9, apron_y-200), Vector2(tower_x-9, apron_y-200)])
+	mast.polygon = PackedVector2Array([Vector2(tower_x-12, apron_y), Vector2(tower_x+12, apron_y), Vector2(tower_x+8, apron_y-150), Vector2(tower_x-8, apron_y-150)])
 	mast.color = Color("6E7B8C")
 	n.add_child(mast)
 	var cab := Polygon2D.new()
-	cab.polygon = PackedVector2Array([Vector2(tower_x-34, apron_y-200), Vector2(tower_x+34, apron_y-200), Vector2(tower_x+24, apron_y-250), Vector2(tower_x-24, apron_y-250)])
+	cab.polygon = PackedVector2Array([Vector2(tower_x-30, apron_y-150), Vector2(tower_x+30, apron_y-150), Vector2(tower_x+22, apron_y-184), Vector2(tower_x-22, apron_y-184)])
 	cab.color = Color("525E6C")
 	n.add_child(cab)
 	var cabglass := Polygon2D.new()
-	cabglass.polygon = PackedVector2Array([Vector2(tower_x-27, apron_y-210), Vector2(tower_x+27, apron_y-210), Vector2(tower_x+19, apron_y-242), Vector2(tower_x-19, apron_y-242)])
+	cabglass.polygon = PackedVector2Array([Vector2(tower_x-24, apron_y-156), Vector2(tower_x+24, apron_y-156), Vector2(tower_x+17, apron_y-178), Vector2(tower_x-17, apron_y-178)])
 	cabglass.color = Color("B7D0E4")
 	n.add_child(cabglass)
 	var roof := Polygon2D.new()
-	roof.polygon = PackedVector2Array([Vector2(tower_x-10, apron_y-250), Vector2(tower_x+10, apron_y-250), Vector2(tower_x+5, apron_y-266), Vector2(tower_x-5, apron_y-266)])
+	roof.polygon = PackedVector2Array([Vector2(tower_x-9, apron_y-184), Vector2(tower_x+9, apron_y-184), Vector2(tower_x+4, apron_y-198), Vector2(tower_x-4, apron_y-198)])
 	roof.color = Color("3C4654")
 	n.add_child(roof)
 	# Перрон (светлый бетон, заметно светлее неба-сумерек).
@@ -2438,22 +2439,28 @@ func _airport_window() -> Node2D:
 	taxi.polygon = PackedVector2Array([Vector2(-W/2, H/2 - 34), Vector2(W/2, H/2 - 34), Vector2(W/2, H/2 - 28), Vector2(-W/2, H/2 - 28)])
 	taxi.color = Color("E7C13E")
 	n.add_child(taxi)
-	# Самолёты (рулят туда-сюда, разворачиваются у краёв — не вылезают за окно).
-	var lim := W/2 - 96.0
-	var plane_cols := ["EDEFF2", "E3E8EE"]
-	for i in range(2):
-		var pl := _airport_plane(plane_cols[i % plane_cols.size()], 0.78)
-		var py := apron_y + 40.0 + float(i) * 30.0
-		pl.position = Vector2(0, py)
-		n.add_child(pl)
-		var dir: float = 1.0 if i % 2 == 0 else -1.0
-		airport_planes.append({"node": pl, "x": randf_range(-lim, lim), "speed": randf_range(22, 38), "dir": dir, "lim": lim, "sc": 0.78, "py": py})
-	# Дальний самолёт у горизонта (меньше, как заходящий).
-	var far_pl := _airport_plane("E9EDF1", 0.5)
-	var fpy := apron_y + 8.0
-	far_pl.position = Vector2(0, fpy)
-	n.add_child(far_pl)
-	airport_planes.append({"node": far_pl, "x": randf_range(-lim, lim), "speed": 30.0, "dir": -1.0, "lim": W/2 - 70.0, "sc": 0.5, "py": fpy})
+	# Дальние самолёты у горизонта — ЛЕТАЮТ/руляют (взлетают-садятся вдалеке).
+	var lim := W/2 - 90.0
+	for f in range(2):
+		var far_pl := _airport_plane(["E9EDF1", "DEE4EA"][f], 0.46)
+		var fpy := apron_y + 6.0 + float(f) * 12.0
+		far_pl.position = Vector2(0, fpy)
+		n.add_child(far_pl)
+		airport_planes.append({"node": far_pl, "x": randf_range(-lim, lim), "speed": randf_range(34, 52), "dir": (1.0 if f == 0 else -1.0), "lim": lim, "sc": 0.46, "py": fpy})
+	# Припаркованные самолёты на ПЕРЕДНЕМ плане — СТОЯТ (не катаются, как машины в Diner).
+	var pk_left := _airport_plane("EDEFF2", 0.95)
+	pk_left.position = Vector2(-W/2 + 250, apron_y + 56)
+	pk_left.scale.x = 0.95          # носом вправо (к терминалу)
+	n.add_child(pk_left)
+	var pk_right := _airport_plane("E6EBF0", 0.9)
+	pk_right.position = Vector2(W/2 - 230, apron_y + 64)
+	pk_right.scale.x = -0.9         # носом влево
+	n.add_child(pk_right)
+	# рукав-телетрап к припаркованному самолёту слева
+	var bridge := Polygon2D.new()
+	bridge.polygon = PackedVector2Array([Vector2(-W/2 + 250 + 70, apron_y + 40), Vector2(-W/2 + 250 + 150, apron_y + 24), Vector2(-W/2 + 250 + 150, apron_y + 40), Vector2(-W/2 + 250 + 76, apron_y + 52)])
+	bridge.color = Color("8E99A6")
+	n.add_child(bridge)
 	# Ночные огни (проявляются ночью через airport_lights.modulate.a).
 	airport_lights = Node2D.new()
 	airport_lights.modulate = Color(1, 1, 1, 0.0)
@@ -2466,7 +2473,7 @@ func _airport_window() -> Node2D:
 		airport_lights.add_child(lp)
 		lx += 70
 	# подсветка окон терминала
-	for wseg in [[-W/2 + 30, 130.0], [W/2 - 330, 160.0]]:
+	for wseg in [[-W/2 + 30, 180.0], [W/2 - 360, 200.0]]:
 		var wx0: float = wseg[0]; var ww: float = wseg[1]
 		var wx := wx0
 		while wx < wx0 + ww:
@@ -2475,13 +2482,12 @@ func _airport_window() -> Node2D:
 			lw.color = Color("FFE3A0")
 			airport_lights.add_child(lw)
 			wx += 22
+	# красный проблесковый маяк на вышке (горит ночью)
+	var beacon := Polygon2D.new()
+	beacon.polygon = _circle_polygon(6.0, 12); beacon.position = Vector2(tower_x, apron_y - 206)
+	beacon.color = Color("FF5A4A")
+	airport_lights.add_child(beacon)
 	n.add_child(airport_lights)
-	# Стеклянные стойки-импосты окна (вертикальные, редкие) — лёгкий намёк на витраж.
-	for ix in [-W/4, W/4]:
-		var post := Polygon2D.new()
-		post.polygon = PackedVector2Array([Vector2(ix-3, -H/2), Vector2(ix+3, -H/2), Vector2(ix+3, H/2), Vector2(ix-3, H/2)])
-		post.color = Color(0.55, 0.62, 0.70, 0.5)
-		n.add_child(post)
 	return n
 
 func _airport_plane(col: String, sc: float) -> Node2D:
@@ -2497,11 +2503,15 @@ func _airport_plane(col: String, sc: float) -> Node2D:
 	tail.polygon = PackedVector2Array([Vector2(-78, -2), Vector2(-92, -34), Vector2(-72, -16), Vector2(-62, -16)])
 	tail.color = Color("3B5B8C")
 	n.add_child(tail)
-	# крыло
+	# крыло (стреловидное, уходит вниз-вперёд) + двигатель под крылом
 	var wing := Polygon2D.new()
-	wing.polygon = PackedVector2Array([Vector2(-12, 6), Vector2(28, 22), Vector2(6, 8)])
-	wing.color = Color(col).darkened(0.12)
+	wing.polygon = PackedVector2Array([Vector2(-6, 4), Vector2(16, 4), Vector2(44, 26), Vector2(30, 28), Vector2(2, 10)])
+	wing.color = Color(col).darkened(0.16)
 	n.add_child(wing)
+	var engine := Polygon2D.new()
+	engine.polygon = PackedVector2Array([Vector2(14, 12), Vector2(30, 12), Vector2(32, 22), Vector2(12, 22)])
+	engine.color = Color("4A535F")
+	n.add_child(engine)
 	# иллюминаторы
 	for i in range(8):
 		var w := Polygon2D.new()
@@ -2516,37 +2526,33 @@ func _airport_plane(col: String, sc: float) -> Node2D:
 	return n
 
 func _airport_hall() -> Node2D:
-	# Зал ожидания: длинная база, ряд кресел и киоск Duty Free со стойкой.
+	# Зона ожидания: ДВА ряда кресел друг за дружкой (дальний выше и мельче — глубина),
+	# рандомно занятые, и киоск Duty Free. Пол — это плитка (рисуется отдельно).
 	var n := Node2D.new()
-	# плинтус/база зала вдоль всей длины
-	var base := Polygon2D.new()
-	base.polygon = PackedVector2Array([Vector2(-1900, 200), Vector2(1900, 200), Vector2(1900, 320), Vector2(-1900, 320)])
-	base.color = Color("B7C0CA")
-	n.add_child(base)
-	var floorline := Polygon2D.new()
-	floorline.polygon = PackedVector2Array([Vector2(-1900, 196), Vector2(1900, 196), Vector2(1900, 204), Vector2(-1900, 204)])
-	floorline.color = Color("99A4B0")
-	n.add_child(floorline)
-	# ряд скреплённых кресел зала ожидания (по центру-слева, видно в портрете)
-	var seats := _airport_seats(5)
-	seats.position = Vector2(-280, -22)
-	n.add_child(seats)
-	# киоск-магазин Duty Free (по центру-справа)
+	# дальний ряд кресел (выше по экрану, мельче — перспектива), несколько кластеров
+	for bx in [-700.0, -360.0, 280.0, 760.0]:
+		var brow := _airport_seats(4)
+		brow.scale = Vector2(0.8, 0.8)
+		brow.position = Vector2(bx, -64)
+		brow.modulate = Color(0.92, 0.94, 0.97)   # дальше — чуть бледнее
+		n.add_child(brow)
+	# ближний ряд кресел (крупнее, ниже)
+	for fx in [-560.0, -180.0, 520.0]:
+		var frow := _airport_seats(4)
+		frow.position = Vector2(fx, -20)
+		n.add_child(frow)
+	# киоск-магазин Duty Free (по центру-справа, на переднем плане)
 	var shop := _airport_shop()
-	shop.scale = Vector2(0.82, 0.82)
-	shop.position = Vector2(250, -24)
+	shop.scale = Vector2(0.86, 0.86)
+	shop.position = Vector2(230, -22)
 	n.add_child(shop)
-	# ещё один ряд кресел дальше слева — для широкого экрана
-	var seats2 := _airport_seats(4)
-	seats2.position = Vector2(-720, -22)
-	n.add_child(seats2)
 	return n
 
 func _airport_seats(count: int) -> Node2D:
 	# Зона ожидания: ряд скреплённых кресел, на части — сидящие пассажиры.
 	var n := Node2D.new()
 	var seat_w := 50.0
-	var sit_cols := ["C0303C", "39689A", "4F9A5B", "B0853A", "7E4FA0", ""]  # "" = пустое кресло
+	var sit_cols := ["C0303C", "39689A", "4F9A5B", "B0853A", "7E4FA0", "C98A2E", "3F8F87"]
 	# общая нижняя рама-перекладина
 	var beam := Polygon2D.new()
 	beam.polygon = PackedVector2Array([Vector2(-8, -8), Vector2(count * seat_w + 8, -8), Vector2(count * seat_w + 8, -2), Vector2(-8, -2)])
@@ -2570,10 +2576,9 @@ func _airport_seats(count: int) -> Node2D:
 		leg.polygon = PackedVector2Array([Vector2(sx + seat_w/2 - 3, -10), Vector2(sx + seat_w/2 + 3, -10), Vector2(sx + seat_w/2 + 3, -2), Vector2(sx + seat_w/2 - 3, -2)])
 		leg.color = Color("5C6671")
 		n.add_child(leg)
-		# пассажир на кресле (если цвет задан)
-		var pc: String = sit_cols[i % sit_cols.size()]
-		if pc != "":
-			var sitter := _airport_sitter(pc)
+		# пассажир на кресле — рандомно (примерно половина кресел пустые)
+		if randf() < 0.5:
+			var sitter := _airport_sitter(sit_cols[randi() % sit_cols.size()])
 			sitter.position = Vector2(sx + seat_w/2.0, -16)
 			n.add_child(sitter)
 	return n
@@ -2634,11 +2639,24 @@ func _airport_shop() -> Node2D:
 		post.polygon = PackedVector2Array([Vector2(px - 4, -86), Vector2(px + 4, -86), Vector2(px + 4, -18), Vector2(px - 4, -18)])
 		post.color = Color("6B7682")
 		n.add_child(post)
-	# товары на стойке
-	var item_cols := ["C0303C", "39A0C8", "8E5BB0", "E7B62E"]
-	for i in range(4):
+	# задняя витрина-полка с рядами бутылочек (заполняем киоск)
+	for shelf_y in [-80.0, -54.0]:
+		var shelf := Polygon2D.new()
+		shelf.polygon = PackedVector2Array([Vector2(-140, shelf_y), Vector2(140, shelf_y), Vector2(140, shelf_y + 4), Vector2(-140, shelf_y + 4)])
+		shelf.color = Color("9A7A30")
+		n.add_child(shelf)
+		var bcols := ["D24B57", "57B0D2", "A86AC0", "E7C13E", "5FB07A", "E08A4A"]
+		for k in range(11):
+			var bot := Polygon2D.new()
+			var bxp := -132.0 + k * 24.0
+			bot.polygon = PackedVector2Array([Vector2(bxp, shelf_y), Vector2(bxp + 12, shelf_y), Vector2(bxp + 12, shelf_y - 20), Vector2(bxp + 8, shelf_y - 26), Vector2(bxp + 4, shelf_y - 26), Vector2(bxp, shelf_y - 20)])
+			bot.color = Color(bcols[(k + int(shelf_y)) % bcols.size()])
+			n.add_child(bot)
+	# товары-коробки на самой стойке (передний ряд)
+	var item_cols := ["C0303C", "39A0C8", "8E5BB0", "E7B62E", "5FB07A"]
+	for i in range(5):
 		var it := Polygon2D.new()
-		it.polygon = PackedVector2Array([Vector2(-110 + i * 60, -10), Vector2(-86 + i * 60, -10), Vector2(-86 + i * 60, -44), Vector2(-110 + i * 60, -44)])
+		it.polygon = PackedVector2Array([Vector2(-120 + i * 52, -10), Vector2(-96 + i * 52, -10), Vector2(-96 + i * 52, -36), Vector2(-120 + i * 52, -36)])
 		it.color = Color(item_cols[i])
 		n.add_child(it)
 	return n
@@ -2712,45 +2730,101 @@ func _airport_person(col: String) -> Node2D:
 	return n
 
 func _airport_upper() -> Node2D:
-	# Верх терминала: потолок, подвесное табло рейсов и указатель к гейтам.
+	# Верх терминала, продолжается ВВЕРХ (при подъёме открывается потолок и крыша):
+	# табло рейсов → подвесные указатели гейтов со стрелками → потолок со светильниками
+	# → фермы крыши → стеклянный фонарь с небом.
 	var n := Node2D.new()
-	# потолочная балка
-	var ceil_beam := Polygon2D.new()
-	ceil_beam.polygon = PackedVector2Array([Vector2(-1900, -40), Vector2(1900, -40), Vector2(1900, 20), Vector2(-1900, 20)])
-	ceil_beam.color = Color("CCD6DE")
-	n.add_child(ceil_beam)
-	# подвесное табло рейсов (тёмная панель со строками)
+
+	# --- табло DEPARTURES (много рейсов) ---
 	var board := Polygon2D.new()
-	board.polygon = PackedVector2Array([Vector2(-230, 30), Vector2(230, 30), Vector2(230, 150), Vector2(-230, 150)])
-	board.color = Color("14181F")
+	board.polygon = PackedVector2Array([Vector2(-250, 28), Vector2(250, 28), Vector2(250, 196), Vector2(-250, 196)])
+	board.color = Color("12161D")
 	n.add_child(board)
 	var title := Label.new()
-	title.text = "DEPARTURES"
-	title.add_theme_font_size_override("font_size", 22)
+	title.text = "✈  DEPARTURES"
+	title.add_theme_font_size_override("font_size", 18)
 	title.add_theme_color_override("font_color", Color("E7B62E"))
-	title.position = Vector2(-220, 34)
+	title.position = Vector2(-240, 32)
 	n.add_child(title)
-	# строки рейсов
-	var dests := ["LONDON", "DUBAI", "PARIS", "TOKYO"]
-	for i in range(4):
+	var flights := [
+		["BA417", "LONDON", "BOARDING"], ["EK132", "DUBAI", "ON TIME"],
+		["AF202", "PARIS", "ON TIME"], ["JL044", "TOKYO", "DELAYED"],
+		["LH788", "BERLIN", "ON TIME"], ["TK019", "ISTANBUL", "GATE 12"],
+		["QR330", "DOHA", "BOARDING"], ["SU261", "MOSCOW", "ON TIME"]]
+	for i in range(flights.size()):
+		var fl: Array = flights[i]
 		var row := Label.new()
-		var st: String = ["ON TIME", "BOARDING", "ON TIME", "DELAYED"][i]
-		row.text = "%s  %s  %s" % [["BA417", "EK132", "AF202", "JL44"][i], dests[i], st]
-		row.add_theme_font_size_override("font_size", 15)
-		row.add_theme_color_override("font_color", Color("6FE08A") if st != "DELAYED" else Color("E07A6F"))
-		row.position = Vector2(-220, 62 + i * 21)
+		var dest: String = fl[1]
+		while dest.length() < 9:
+			dest += " "
+		row.text = "%s  %s %s" % [fl[0], dest, fl[2]]
+		row.add_theme_font_size_override("font_size", 13)
+		var sc: Color = Color("E07A6F") if fl[2] == "DELAYED" else (Color("E7B62E") if fl[2] == "BOARDING" else Color("6FE08A"))
+		row.add_theme_color_override("font_color", sc)
+		row.position = Vector2(-240, 56 + i * 17)
 		n.add_child(row)
-	# указатель к гейтам (зелёная табличка слева)
-	var gate_sign := Polygon2D.new()
-	gate_sign.polygon = PackedVector2Array([Vector2(-560, 40), Vector2(-330, 40), Vector2(-330, 92), Vector2(-560, 92)])
-	gate_sign.color = Color("2E7D4F")
-	n.add_child(gate_sign)
-	var glabel := Label.new()
-	glabel.text = "GATES  A1-A20  ▶"
-	glabel.add_theme_font_size_override("font_size", 18)
-	glabel.add_theme_color_override("font_color", Color("F4ECD8"))
-	glabel.position = Vector2(-552, 50)
-	n.add_child(glabel)
+
+	# --- подвесные указатели гейтов со СТРЕЛКАМИ (как в настоящем аэропорту) ---
+	var signs := [
+		[-148.0, -104.0, 232.0, "2E7D4F", "◀ GATES A1–A12"],
+		[148.0, -104.0, 232.0, "2E7D4F", "GATES B1–B20 ▶"],
+		[0.0, -182.0, 300.0, "2B5DA8", "BAGGAGE ▼   LOUNGE ▲"]]
+	for sg in signs:
+		var sgx: float = sg[0]; var sgy: float = sg[1]
+		var w: float = sg[2]
+		var panel := Polygon2D.new()
+		panel.polygon = PackedVector2Array([Vector2(sgx-w/2, sgy), Vector2(sgx+w/2, sgy), Vector2(sgx+w/2, sgy+46), Vector2(sgx-w/2, sgy+46)])
+		panel.color = Color(sg[3])
+		n.add_child(panel)
+		# подвес к потолку
+		for hx in [sgx - w/2 + 24, sgx + w/2 - 24]:
+			var hang := Polygon2D.new()
+			hang.polygon = PackedVector2Array([Vector2(hx-2, sgy-26), Vector2(hx+2, sgy-26), Vector2(hx+2, sgy), Vector2(hx-2, sgy)])
+			hang.color = Color("8A93A0")
+			n.add_child(hang)
+		var sl := Label.new()
+		sl.text = String(sg[4])
+		sl.add_theme_font_size_override("font_size", 16)
+		sl.add_theme_color_override("font_color", Color("F4ECD8"))
+		sl.position = Vector2(sgx - w/2 + 12, sgy + 12)
+		n.add_child(sl)
+
+	# --- потолок со встроенными светильниками ---
+	var ceil_band := Polygon2D.new()
+	ceil_band.polygon = PackedVector2Array([Vector2(-1900, -330), Vector2(1900, -330), Vector2(1900, -230), Vector2(-1900, -230)])
+	ceil_band.color = Color("CBD5DD")
+	n.add_child(ceil_band)
+	var px := -1860.0
+	while px < 1900.0:
+		var panel := Polygon2D.new()
+		panel.polygon = PackedVector2Array([Vector2(px, -304), Vector2(px + 90, -304), Vector2(px + 90, -290), Vector2(px, -290)])
+		panel.color = Color("FFF6D8")
+		n.add_child(panel)
+		px += 150
+	# --- фермы крыши (диагональные балки) ---
+	var truss_band := Polygon2D.new()
+	truss_band.polygon = PackedVector2Array([Vector2(-1900, -440), Vector2(1900, -440), Vector2(1900, -330), Vector2(-1900, -330)])
+	truss_band.color = Color("AEB8C2")
+	n.add_child(truss_band)
+	var tx := -1860.0
+	while tx < 1900.0:
+		var beam := Polygon2D.new()
+		beam.polygon = PackedVector2Array([Vector2(tx, -340), Vector2(tx + 14, -340), Vector2(tx + 70, -430), Vector2(tx + 56, -430)])
+		beam.color = Color("909CA8")
+		n.add_child(beam)
+		tx += 70
+	# --- стеклянный фонарь крыши с небом (самый верх) ---
+	var skylight := Polygon2D.new()
+	skylight.polygon = PackedVector2Array([Vector2(-1900, -650), Vector2(1900, -650), Vector2(1900, -440), Vector2(-1900, -440)])
+	skylight.color = Color("ABD2F0")
+	n.add_child(skylight)
+	var mx := -1860.0
+	while mx < 1900.0:
+		var mull := Polygon2D.new()
+		mull.polygon = PackedVector2Array([Vector2(mx-4, -650), Vector2(mx+4, -650), Vector2(mx+4, -440), Vector2(mx-4, -440)])
+		mull.color = Color("8FA9C2")
+		n.add_child(mull)
+		mx += 120
 	return n
 
 func _sprite_scaled_to_width(tex: Texture2D, target_w: float) -> Sprite2D:
