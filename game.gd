@@ -2324,16 +2324,26 @@ func _update_airport() -> void:
 	if airport_lights:
 		airport_lights.modulate.a = _airport_night
 
-	# Самолёты рулят по перрону и разворачиваются у краёв (не вылезают за окно).
+	# Самолёты: дальние в небе летят по диагонали (садятся/взлетают за здания),
+	# рулящий едет вдоль полосы и разворачивается у краёв.
 	for p in airport_planes:
-		p["x"] += p["speed"] * p["dir"] * dt
-		if p["x"] > p["lim"]:
-			p["x"] = p["lim"]; p["dir"] = -1.0
-		elif p["x"] < -p["lim"]:
-			p["x"] = -p["lim"]; p["dir"] = 1.0
 		var pn: Node2D = p["node"]
-		pn.position.x = p["x"]
-		pn.scale.x = p["sc"] * p["dir"]   # нос по ходу движения
+		if p.get("kind", "") == "sky":
+			p["x"] += p["vx"] * dt
+			p["y"] += p["vy"] * dt
+			if p["y"] > p["horizon"] - 8.0 or p["y"] < p["top"] - 40.0 or absf(p["x"]) > p["hx"] + 50.0:
+				_airport_sky_respawn(p)
+			pn.position = Vector2(p["x"], p["y"])
+			pn.scale.x = p["sc"] * (1.0 if p["vx"] >= 0.0 else -1.0)
+			pn.scale.y = p["sc"]
+		else:
+			p["x"] += p["speed"] * p["dir"] * dt
+			if p["x"] > p["lim"]:
+				p["x"] = p["lim"]; p["dir"] = -1.0
+			elif p["x"] < -p["lim"]:
+				p["x"] = -p["lim"]; p["dir"] = 1.0
+			pn.position.x = p["x"]
+			pn.scale.x = p["sc"] * p["dir"]   # нос по ходу движения
 	# Человечки едут по травалатору.
 	for h in airport_people:
 		h["x"] += h["speed"] * dt
@@ -2341,6 +2351,19 @@ func _update_airport() -> void:
 			h["x"] = -h["w"] / 2.0 - 30.0
 		var hn: Node2D = h["node"]
 		hn.position.x = h["x"]
+
+func _airport_sky_respawn(p: Dictionary) -> void:
+	# Новая случайная диагональная траектория для самолёта в небе: влетает с одного
+	# края, садится (вниз к горизонту) или взлетает (вверх) — рандомно.
+	var from_left: bool = randf() < 0.5
+	var sp: float = randf_range(62.0, 108.0)
+	p["x"] = (-(p["hx"] + 30.0)) if from_left else (p["hx"] + 30.0)
+	p["vx"] = sp if from_left else -sp
+	p["y"] = randf_range(p["top"] + 30.0, p["horizon"] - 150.0)
+	if randf() < 0.6:
+		p["vy"] = randf_range(20.0, 40.0)     # снижается → садится за здание
+	else:
+		p["vy"] = randf_range(-34.0, -16.0)   # набирает высоту (взлёт)
 
 func _airport_floor() -> Node2D:
 	# Пол зала: плитка в шашечку от низа окна ВНИЗ ДО травалатора (по нему идут люди),
@@ -2351,20 +2374,20 @@ func _airport_floor() -> Node2D:
 	solid.polygon = PackedVector2Array([Vector2(-1900, 96), Vector2(1900, 96), Vector2(1900, 1000), Vector2(-1900, 1000)])
 	solid.color = Color("C7CFD7")
 	n.add_child(solid)
-	# плитка только в зоне зала (до травалатора)
-	var tw := 88.0
-	var y := -40.0
-	while y < 96.0:
-		var th := 30.0 + maxf(0.0, (y + 40.0) / 18.0) * 3.0
-		var x := -1900.0
+	# плитка только в зоне зала (до травалатора) — ровная шашечка с явным контрастом
+	var tw := 96.0
+	var th := 40.0
+	var rows := 4
+	for r in range(rows):
+		var y := -40.0 + r * th
+		var x := -1920.0
 		var c := 0
-		while x < 1900.0:
+		while x < 1920.0:
 			var q := Polygon2D.new()
-			q.polygon = PackedVector2Array([Vector2(x + 1.5, y + 1.5), Vector2(x + tw - 1.5, y + 1.5), Vector2(x + tw - 1.5, y + th - 1.5), Vector2(x + 1.5, y + th - 1.5)])
-			q.color = Color("DCE3E9") if (int(y / 20.0) + c) % 2 == 0 else Color("CAD2DA")
+			q.polygon = PackedVector2Array([Vector2(x + 1, y + 1), Vector2(x + tw - 1, y + 1), Vector2(x + tw - 1, y + th - 1), Vector2(x + 1, y + th - 1)])
+			q.color = Color("E2E8ED") if (r + c) % 2 == 0 else Color("BFC8D1")
 			n.add_child(q)
 			x += tw; c += 1
-		y += th
 	return n
 
 func _airport_window() -> Node2D:
@@ -2392,7 +2415,18 @@ func _airport_window() -> Node2D:
 	airport_moon.position = Vector2(W/2 - 150, -H/2 + 88)
 	airport_moon.color = Color("EFE9D2")
 	n.add_child(airport_moon)
-	# Дальние корпуса терминала (плоские, крупные, со стеклянной лентой) на горизонте.
+	# Самолёты-силуэты В НЕБЕ (рисуем ДО зданий → садятся/скрываются за зданиями).
+	# Летят по диагонали, рандомно заходят на посадку/взлетают (см. _update_airport).
+	for s in range(2):
+		var sky_pl := _airport_plane(["6E92BB", "7C9EC4"][s], 0.42)
+		sky_pl.modulate = Color(1, 1, 1, 0.9)
+		n.add_child(sky_pl)
+		var sp := {"node": sky_pl, "kind": "sky", "sc": 0.42, "hx": W/2, "top": -H/2, "horizon": apron_y}
+		_airport_sky_respawn(sp)
+		# при старте раскидать по траектории, чтобы не вылетали разом
+		sp["x"] = randf_range(-W/2 + 60, W/2 - 60)
+		sp["y"] = randf_range(-H/2 + 40, apron_y - 90)
+		airport_planes.append(sp)
 	for seg in [[-W/2, 230.0, 110.0], [-W/2 + 232, 180.0, 80.0], [W/2 - 380, 200.0, 130.0], [W/2 - 175, 175.0, 92.0]]:
 		var bx: float = seg[0]; var bw: float = seg[1]; var bh: float = seg[2]
 		var b := Polygon2D.new()
@@ -2445,38 +2479,22 @@ func _airport_window() -> Node2D:
 	taxi.polygon = PackedVector2Array([Vector2(-W/2, H/2 - 34), Vector2(W/2, H/2 - 34), Vector2(W/2, H/2 - 28), Vector2(-W/2, H/2 - 28)])
 	taxi.color = Color("E7C13E")
 	n.add_child(taxi)
-	# Самолёты-силуэты В НЕБЕ — голубые (как небо, темнее), будто вдалеке заходят на
-	# посадку / взлетают. Летают выше горизонта.
-	var sky_lim := W/2 - 70.0
-	for s in range(2):
-		var sky_pl := _airport_plane(["6E92BB", "7C9EC4"][s], 0.4)
-		var spy := -H/2 + 70.0 + float(s) * 56.0
-		sky_pl.position = Vector2(0, spy)
-		sky_pl.modulate = Color(1, 1, 1, 0.85)
-		n.add_child(sky_pl)
-		airport_planes.append({"node": sky_pl, "x": randf_range(-sky_lim, sky_lim), "speed": randf_range(46, 70), "dir": (1.0 if s == 0 else -1.0), "lim": sky_lim, "sc": 0.4, "py": spy})
-	# Одинокий рулящий самолёт по дальней полосе (изредка проезжает).
+	# Рулящий самолёт ПО ПОЛОСЕ (едет вдоль взлётной полосы туда-сюда).
 	var lim := W/2 - 90.0
-	var taxipl := _airport_plane("E3E8EE", 0.5)
-	var tpy := apron_y + 10.0
+	var taxipl := _airport_plane("E3E8EE", 0.62)
+	var tpy := apron_y + 60.0          # на тёмной ленте полосы
 	taxipl.position = Vector2(0, tpy)
 	n.add_child(taxipl)
-	airport_planes.append({"node": taxipl, "x": randf_range(-lim, lim), "speed": 30.0, "dir": -1.0, "lim": lim, "sc": 0.5, "py": tpy})
-	# Припаркованные самолёты на ПЕРЕДНЕМ плане — КРУПНЫЕ, СТОЯТ (как у терминала).
-	var pk_left := _airport_plane("EDEFF2", 1.35)
-	pk_left.position = Vector2(-W/2 + 360, apron_y + 96)
-	pk_left.scale.x = 1.35          # носом вправо (к терминалу)
+	airport_planes.append({"node": taxipl, "kind": "taxi", "x": randf_range(-lim, lim), "speed": 34.0, "dir": -1.0, "lim": lim, "sc": 0.62, "py": tpy})
+	# Припаркованные самолёты на ПЕРЕДНЕМ плане — ОЧЕНЬ КРУПНЫЕ, СТОЯТ у терминала.
+	var pk_left := _airport_plane("EDEFF2", 1.6)
+	pk_left.position = Vector2(-W/2 + 380, apron_y + 120)
+	pk_left.scale.x = 1.6           # носом вправо (к терминалу)
 	n.add_child(pk_left)
-	var pk_right := _airport_plane("E6EBF0", 1.2)
-	pk_right.position = Vector2(W/2 - 300, apron_y + 110)
-	pk_right.scale.x = -1.2         # носом влево
+	var pk_right := _airport_plane("E6EBF0", 1.45)
+	pk_right.position = Vector2(W/2 - 320, apron_y + 134)
+	pk_right.scale.x = -1.45        # носом влево
 	n.add_child(pk_right)
-	# рукав-телетрап к припаркованному самолёту слева
-	var bridge := Polygon2D.new()
-	var bxr := -W/2 + 360 + 96.0
-	bridge.polygon = PackedVector2Array([Vector2(bxr, apron_y + 64), Vector2(bxr + 110, apron_y + 40), Vector2(bxr + 110, apron_y + 60), Vector2(bxr + 8, apron_y + 84)])
-	bridge.color = Color("8E99A6")
-	n.add_child(bridge)
 	# Ночные огни (проявляются ночью через airport_lights.modulate.a).
 	airport_lights = Node2D.new()
 	airport_lights.modulate = Color(1, 1, 1, 0.0)
@@ -2507,38 +2525,59 @@ func _airport_window() -> Node2D:
 	return n
 
 func _airport_plane(col: String, sc: float) -> Node2D:
-	# Простой пассажирский самолёт сбоку.
+	# Пассажирский самолёт сбоку (нос вправо): крыло, шасси с колёсами, оперение.
 	var n := Node2D.new()
 	n.scale = Vector2(sc, sc)
-	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([Vector2(-78, 0), Vector2(-64, -16), Vector2(48, -16), Vector2(78, -6), Vector2(80, 2), Vector2(56, 10), Vector2(-64, 10)])
-	body.color = Color(col)
-	n.add_child(body)
-	# хвостовое оперение
-	var tail := Polygon2D.new()
-	tail.polygon = PackedVector2Array([Vector2(-78, -2), Vector2(-92, -34), Vector2(-72, -16), Vector2(-62, -16)])
-	tail.color = Color("3B5B8C")
-	n.add_child(tail)
-	# крыло (стреловидное, уходит вниз-вперёд) + двигатель под крылом
+	var dk: Color = Color(col).darkened(0.18)
+	# Шасси (рисуем первыми, под фюзеляжем): стойки + колёса.
+	for gx in [50.0, -6.0, 6.0]:
+		var strut := Polygon2D.new()
+		strut.polygon = PackedVector2Array([Vector2(gx-1.5, 9), Vector2(gx+1.5, 9), Vector2(gx+1.5, 22), Vector2(gx-1.5, 22)])
+		strut.color = Color("3A3F47")
+		n.add_child(strut)
+		var wheel := Polygon2D.new()
+		wheel.polygon = _circle_polygon(4.5, 12); wheel.position = Vector2(gx, 24)
+		wheel.color = Color("181A1F")
+		n.add_child(wheel)
+	# Главное крыло — крупное стреловидное, свисает вниз-назад (хорошо читается).
 	var wing := Polygon2D.new()
-	wing.polygon = PackedVector2Array([Vector2(-6, 4), Vector2(16, 4), Vector2(44, 26), Vector2(30, 28), Vector2(2, 10)])
-	wing.color = Color(col).darkened(0.16)
+	wing.polygon = PackedVector2Array([Vector2(18, 4), Vector2(0, 4), Vector2(-34, 30), Vector2(-12, 30)])
+	wing.color = dk
 	n.add_child(wing)
+	# Двигатель под крылом.
 	var engine := Polygon2D.new()
-	engine.polygon = PackedVector2Array([Vector2(14, 12), Vector2(30, 12), Vector2(32, 22), Vector2(12, 22)])
+	engine.polygon = PackedVector2Array([Vector2(-18, 18), Vector2(-2, 18), Vector2(0, 30), Vector2(-20, 30)])
 	engine.color = Color("4A535F")
 	n.add_child(engine)
-	# иллюминаторы
-	for i in range(8):
-		var w := Polygon2D.new()
-		w.polygon = _circle_polygon(3.4, 10); w.position = Vector2(-52 + i * 13, -4)
-		w.color = Color("2A3550")
-		n.add_child(w)
-	# полоса по борту
+	# Фюзеляж.
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-80, 0), Vector2(-66, -15), Vector2(50, -15), Vector2(80, -5), Vector2(82, 3), Vector2(58, 11), Vector2(-66, 11)])
+	body.color = Color(col)
+	n.add_child(body)
+	# Киль (вертикальное оперение) + стабилизатор.
+	var fin := Polygon2D.new()
+	fin.polygon = PackedVector2Array([Vector2(-80, -13), Vector2(-94, -40), Vector2(-74, -15), Vector2(-64, -15)])
+	fin.color = Color("3B5B8C")
+	n.add_child(fin)
+	var stab := Polygon2D.new()
+	stab.polygon = PackedVector2Array([Vector2(-66, -4), Vector2(-92, -2), Vector2(-72, 2)])
+	stab.color = dk
+	n.add_child(stab)
+	# Полоса по борту + иллюминаторы.
 	var stripe := Polygon2D.new()
-	stripe.polygon = PackedVector2Array([Vector2(-64, 2), Vector2(56, 2), Vector2(56, 6), Vector2(-64, 6)])
+	stripe.polygon = PackedVector2Array([Vector2(-64, 1), Vector2(58, 1), Vector2(58, 5), Vector2(-64, 5)])
 	stripe.color = Color("3B5B8C")
 	n.add_child(stripe)
+	for i in range(8):
+		var w := Polygon2D.new()
+		w.polygon = _circle_polygon(3.0, 10); w.position = Vector2(-52 + i * 13, -4)
+		w.color = Color("2A3550")
+		n.add_child(w)
+	# Кабинные стёкла (нос).
+	var cockpit := Polygon2D.new()
+	cockpit.polygon = PackedVector2Array([Vector2(60, -8), Vector2(74, -4), Vector2(60, -1)])
+	cockpit.color = Color("2A3550")
+	n.add_child(cockpit)
 	return n
 
 func _airport_hall() -> Node2D:
