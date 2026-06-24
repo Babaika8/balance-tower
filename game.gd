@@ -2524,70 +2524,68 @@ func _airport_window() -> Node2D:
 	n.add_child(airport_lights)
 	return n
 
-# Контурная деталь (плоский вектор с тёмной обводкой, как на иконке-референсе).
-func _plane_part(parent: Node2D, pts: PackedVector2Array, fill: Color, ow: float = 4.0) -> void:
-	var p := Polygon2D.new()
-	p.polygon = pts
-	p.color = fill
-	parent.add_child(p)
-	var l := Line2D.new()
-	l.points = pts
-	l.closed = true
-	l.width = ow
-	l.default_color = Color("21365C")    # тёмно-синяя обводка
-	l.joint_mode = Line2D.LINE_JOINT_ROUND
-	l.antialiased = true
-	parent.add_child(l)
-
 func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
-	# Плоский самолёт в стиле иконки (референс): тёмно-синяя обводка, светлый фюзеляж,
-	# КРАСНЫЕ крылья и хвост, бирюзовая кабина, окна-иллюминаторы. Нос вправо.
+	# Пассажирский самолёт сбоку (нос вправо). Крыло и хвост — ярким акцентным цветом
+	# и массивные, чтобы хорошо читались.
 	var n := Node2D.new()
 	n.scale = Vector2(sc, sc)
-	var red := Color("EE5B43")
-	var red_dk := Color("D24632")
-	var body_col := Color(col)
+	var accent := Color("2C5FA6")        # яркий акцент: крылья, киль, полоса
 	# Шасси (только у наземных): стойки + колёса.
 	if show_gear:
-		for gx in [52.0, -10.0, 8.0]:
+		for gx in [52.0, -8.0, 8.0]:
 			var strut := Polygon2D.new()
-			strut.polygon = PackedVector2Array([Vector2(gx-2, 8), Vector2(gx+2, 8), Vector2(gx+2, 22), Vector2(gx-2, 22)])
+			strut.polygon = PackedVector2Array([Vector2(gx-1.6, 9), Vector2(gx+1.6, 9), Vector2(gx+1.6, 23), Vector2(gx-1.6, 23)])
 			strut.color = Color("3A3F47")
 			n.add_child(strut)
 			var wheel := Polygon2D.new()
-			wheel.polygon = _circle_polygon(5.0, 12); wheel.position = Vector2(gx, 24)
-			wheel.color = Color("23365C")
+			wheel.polygon = _circle_polygon(5.0, 12); wheel.position = Vector2(gx, 25)
+			wheel.color = Color("181A1F")
 			n.add_child(wheel)
-	# Дальнее крыло (вверх-назад) — темнее красного, для объёма «расправленных крыльев».
-	_plane_part(n, PackedVector2Array([Vector2(8, -10), Vector2(-14, -10), Vector2(-48, -46), Vector2(-18, -42)]), red_dk)
-	# Киль (хвост) — красный, свеж вверх-назад.
-	_plane_part(n, PackedVector2Array([Vector2(-78, -14), Vector2(-104, -52), Vector2(-82, -54), Vector2(-58, -14)]), red)
-	# Фюзеляж — светлый, скруглённый.
-	_plane_part(n, PackedVector2Array([
-		Vector2(-86, -2), Vector2(-74, -15), Vector2(46, -16), Vector2(76, -11),
-		Vector2(88, -2), Vector2(88, 5), Vector2(72, 13), Vector2(-72, 13), Vector2(-86, 6)]), body_col)
-	# Низ фюзеляжа чуть темнее (объём).
-	var belly := Polygon2D.new()
-	belly.polygon = PackedVector2Array([Vector2(-84, 5), Vector2(86, 5), Vector2(72, 13), Vector2(-72, 13)])
-	belly.color = body_col.darkened(0.10)
-	n.add_child(belly)
-	# Ближнее крыло (вниз-назад) — крупное красное.
-	_plane_part(n, PackedVector2Array([Vector2(30, 6), Vector2(2, 6), Vector2(-46, 44), Vector2(-10, 44)]), red)
-	# Иллюминаторы — скруглённые «окошки».
-	for i in range(4):
-		_plane_part(n, _round_rect(-30 + i * 26, -8, 14, 12, 4), Color("C9D3E2"), 2.6)
-	# Кабина — бирюзовое стекло у носа.
-	_plane_part(n, PackedVector2Array([Vector2(58, -10), Vector2(80, -4), Vector2(80, 2), Vector2(58, 4)]), Color("7FD2D6"))
+	# ЗАДНЕЕ крыло (дальнее) — рисуем за фюзеляжем, чуть бледнее, для объёма.
+	var wing_far := Polygon2D.new()
+	wing_far.polygon = PackedVector2Array([Vector2(20, -2), Vector2(0, -2), Vector2(-30, 16), Vector2(-8, 16)])
+	wing_far.color = accent.lightened(0.22)
+	n.add_child(wing_far)
+	# Фюзеляж.
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-82, 0), Vector2(-66, -16), Vector2(52, -16), Vector2(84, -5), Vector2(86, 4), Vector2(60, 12), Vector2(-66, 12)])
+	body.color = Color(col)
+	n.add_child(body)
+	# КИЛЬ (вертикальный хвост) — крупный, акцентный, хорошо видно.
+	var fin := Polygon2D.new()
+	fin.polygon = PackedVector2Array([Vector2(-82, -14), Vector2(-104, -54), Vector2(-86, -54), Vector2(-64, -16)])
+	fin.color = accent
+	n.add_child(fin)
+	# Горизонтальный стабилизатор на хвосте.
+	var stab := Polygon2D.new()
+	stab.polygon = PackedVector2Array([Vector2(-70, -8), Vector2(-100, -16), Vector2(-96, -8), Vector2(-70, -2)])
+	stab.color = accent
+	n.add_child(stab)
+	# ГЛАВНОЕ (ближнее) крыло — крупное, массивное, акцентным цветом, свисает вниз-назад.
+	var wing := Polygon2D.new()
+	wing.polygon = PackedVector2Array([Vector2(30, 2), Vector2(4, 2), Vector2(-46, 40), Vector2(-12, 40)])
+	wing.color = accent
+	n.add_child(wing)
+	# Двигатель под крылом.
+	var engine := Polygon2D.new()
+	engine.polygon = PackedVector2Array([Vector2(-20, 24), Vector2(-2, 24), Vector2(2, 40), Vector2(-22, 40)])
+	engine.color = Color("33383F")
+	n.add_child(engine)
+	# Полоса по борту + иллюминаторы + кабина.
+	var stripe := Polygon2D.new()
+	stripe.polygon = PackedVector2Array([Vector2(-64, 0), Vector2(60, 0), Vector2(60, 5), Vector2(-64, 5)])
+	stripe.color = accent
+	n.add_child(stripe)
+	for i in range(8):
+		var w := Polygon2D.new()
+		w.polygon = _circle_polygon(3.0, 10); w.position = Vector2(-52 + i * 13, -5)
+		w.color = Color("2A3550")
+		n.add_child(w)
+	var cockpit := Polygon2D.new()
+	cockpit.polygon = PackedVector2Array([Vector2(62, -9), Vector2(78, -4), Vector2(62, -1)])
+	cockpit.color = Color("2A3550")
+	n.add_child(cockpit)
 	return n
-
-# Скруглённый прямоугольник (для окон-иллюминаторов).
-func _round_rect(cx: float, cy: float, w: float, h: float, r: float) -> PackedVector2Array:
-	var hw := w / 2.0; var hh := h / 2.0
-	return PackedVector2Array([
-		Vector2(cx - hw + r, cy - hh), Vector2(cx + hw - r, cy - hh),
-		Vector2(cx + hw, cy - hh + r), Vector2(cx + hw, cy + hh - r),
-		Vector2(cx + hw - r, cy + hh), Vector2(cx - hw + r, cy + hh),
-		Vector2(cx - hw, cy + hh - r), Vector2(cx - hw, cy - hh + r)])
 
 func _airport_hall() -> Node2D:
 	# Зал ожидания вынесен к КРАЯМ, центр (где ставятся чемоданы) свободен.
