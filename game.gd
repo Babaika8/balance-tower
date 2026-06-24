@@ -2552,13 +2552,13 @@ func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
 	body.polygon = PackedVector2Array([Vector2(-82, 0), Vector2(-66, -16), Vector2(52, -16), Vector2(84, -5), Vector2(86, 4), Vector2(60, 12), Vector2(-66, 12)])
 	body.color = Color(col)
 	n.add_child(body)
-	# КИЛЬ (хвост) — сросся с фюзеляжем (широкое основание на корпусе), верх ЗАКРУГЛЁН,
-	# как кончик крыла; не висит в воздухе.
+	# КИЛЬ (хвост): основание ИДЁТ ПО КОРПУСУ (по скату задней части фюзеляжа) — без
+	# белого зазора, сросся с телом; верх закруглён, как кончик крыла.
 	var fin := Polygon2D.new()
 	fin.polygon = PackedVector2Array([
-		Vector2(-56, -15), Vector2(-80, -14),
-		Vector2(-94, -44), Vector2(-96, -49), Vector2(-93, -53), Vector2(-88, -54), Vector2(-84, -50),
-		Vector2(-72, -34), Vector2(-58, -16)])
+		Vector2(-52, -16), Vector2(-82, -1),
+		Vector2(-95, -40), Vector2(-97, -46), Vector2(-93, -50), Vector2(-87, -50), Vector2(-84, -45),
+		Vector2(-74, -30), Vector2(-56, -16)])
 	fin.color = accent
 	n.add_child(fin)
 	# ГЛАВНОЕ крыло — широкое у тела самолёта, к концу плавно сужается (без чёрного
