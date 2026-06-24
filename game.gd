@@ -2331,7 +2331,7 @@ func _update_airport() -> void:
 		if p.get("kind", "") == "sky":
 			p["x"] += p["vx"] * dt
 			p["y"] += p["vy"] * dt
-			if p["y"] > p["horizon"] - 8.0 or p["y"] < p["top"] - 40.0 or absf(p["x"]) > p["hx"] + 50.0:
+			if p["y"] > p["horizon"] - 6.0 or p["y"] < p["top"] - 22.0 or absf(p["x"]) > p["hx"] - 30.0:
 				_airport_sky_respawn(p)
 			pn.position = Vector2(p["x"], p["y"])
 			pn.scale.x = p["sc"] * (1.0 if p["vx"] >= 0.0 else -1.0)
@@ -2353,17 +2353,18 @@ func _update_airport() -> void:
 		hn.position.x = h["x"]
 
 func _airport_sky_respawn(p: Dictionary) -> void:
-	# Новая случайная диагональная траектория для самолёта в небе: влетает с одного
-	# края, садится (вниз к горизонту) или взлетает (вверх) — рандомно.
-	var from_left: bool = randf() < 0.5
-	var sp: float = randf_range(62.0, 108.0)
-	p["x"] = (-(p["hx"] + 30.0)) if from_left else (p["hx"] + 30.0)
-	p["vx"] = sp if from_left else -sp
-	p["y"] = randf_range(p["top"] + 30.0, p["horizon"] - 150.0)
-	if randf() < 0.6:
-		p["vy"] = randf_range(20.0, 40.0)     # снижается → садится за здание
+	# Самолёт в небе ВНУТРИ окна: садится (сверху вниз к горизонту, скрывается за
+	# зданием) или взлетает (от горизонта вверх). Движение почти вертикальное со
+	# слабым сносом вбок — НЕ вылетает за раму окна.
+	var inner: float = p["hx"] - 200.0
+	p["x"] = randf_range(-inner, inner) * 0.7
+	p["vx"] = randf_range(-26.0, 26.0)
+	if randf() < 0.55:
+		p["y"] = p["top"] + randf_range(16.0, 50.0)     # старт высоко
+		p["vy"] = randf_range(40.0, 58.0)               # снижается → садится за здание
 	else:
-		p["vy"] = randf_range(-34.0, -16.0)   # набирает высоту (взлёт)
+		p["y"] = p["horizon"] - randf_range(16.0, 46.0) # старт у горизонта (из-за здания)
+		p["vy"] = -randf_range(36.0, 52.0)              # набирает высоту (взлёт)
 
 func _airport_floor() -> Node2D:
 	# Пол зала: плитка в шашечку от низа окна ВНИЗ ДО травалатора (по нему идут люди),
@@ -2423,8 +2424,7 @@ func _airport_window() -> Node2D:
 		n.add_child(sky_pl)
 		var sp := {"node": sky_pl, "kind": "sky", "sc": 0.42, "hx": W/2, "top": -H/2, "horizon": apron_y}
 		_airport_sky_respawn(sp)
-		# при старте раскидать по траектории, чтобы не вылетали разом
-		sp["x"] = randf_range(-W/2 + 60, W/2 - 60)
+		# при старте раскидать по высоте, чтобы не двигались синхронно
 		sp["y"] = randf_range(-H/2 + 40, apron_y - 90)
 		airport_planes.append(sp)
 	for seg in [[-W/2, 230.0, 110.0], [-W/2 + 232, 180.0, 80.0], [W/2 - 380, 200.0, 130.0], [W/2 - 175, 175.0, 92.0]]:
@@ -2525,57 +2525,63 @@ func _airport_window() -> Node2D:
 	return n
 
 func _airport_plane(col: String, sc: float) -> Node2D:
-	# Пассажирский самолёт сбоку (нос вправо): крыло, шасси с колёсами, оперение.
+	# Пассажирский самолёт сбоку (нос вправо). Крыло и хвост — ярким акцентным цветом
+	# и массивные, чтобы хорошо читались.
 	var n := Node2D.new()
 	n.scale = Vector2(sc, sc)
-	var dk: Color = Color(col).darkened(0.18)
-	# Шасси (рисуем первыми, под фюзеляжем): стойки + колёса.
-	for gx in [50.0, -6.0, 6.0]:
+	var accent := Color("2C5FA6")        # яркий акцент: крылья, киль, полоса
+	# Шасси (под фюзеляжем): стойки + колёса.
+	for gx in [52.0, -8.0, 8.0]:
 		var strut := Polygon2D.new()
-		strut.polygon = PackedVector2Array([Vector2(gx-1.5, 9), Vector2(gx+1.5, 9), Vector2(gx+1.5, 22), Vector2(gx-1.5, 22)])
+		strut.polygon = PackedVector2Array([Vector2(gx-1.6, 9), Vector2(gx+1.6, 9), Vector2(gx+1.6, 23), Vector2(gx-1.6, 23)])
 		strut.color = Color("3A3F47")
 		n.add_child(strut)
 		var wheel := Polygon2D.new()
-		wheel.polygon = _circle_polygon(4.5, 12); wheel.position = Vector2(gx, 24)
+		wheel.polygon = _circle_polygon(5.0, 12); wheel.position = Vector2(gx, 25)
 		wheel.color = Color("181A1F")
 		n.add_child(wheel)
-	# Главное крыло — крупное стреловидное, свисает вниз-назад (хорошо читается).
+	# ЗАДНЕЕ крыло (дальнее) — рисуем за фюзеляжем, чуть бледнее, для объёма.
+	var wing_far := Polygon2D.new()
+	wing_far.polygon = PackedVector2Array([Vector2(20, -2), Vector2(0, -2), Vector2(-30, 16), Vector2(-8, 16)])
+	wing_far.color = accent.lightened(0.22)
+	n.add_child(wing_far)
+	# Фюзеляж.
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-82, 0), Vector2(-66, -16), Vector2(52, -16), Vector2(84, -5), Vector2(86, 4), Vector2(60, 12), Vector2(-66, 12)])
+	body.color = Color(col)
+	n.add_child(body)
+	# КИЛЬ (вертикальный хвост) — крупный, акцентный, хорошо видно.
+	var fin := Polygon2D.new()
+	fin.polygon = PackedVector2Array([Vector2(-82, -14), Vector2(-104, -54), Vector2(-86, -54), Vector2(-64, -16)])
+	fin.color = accent
+	n.add_child(fin)
+	# Горизонтальный стабилизатор на хвосте.
+	var stab := Polygon2D.new()
+	stab.polygon = PackedVector2Array([Vector2(-70, -8), Vector2(-100, -16), Vector2(-96, -8), Vector2(-70, -2)])
+	stab.color = accent
+	n.add_child(stab)
+	# ГЛАВНОЕ (ближнее) крыло — крупное, массивное, акцентным цветом, свисает вниз-назад.
 	var wing := Polygon2D.new()
-	wing.polygon = PackedVector2Array([Vector2(18, 4), Vector2(0, 4), Vector2(-34, 30), Vector2(-12, 30)])
-	wing.color = dk
+	wing.polygon = PackedVector2Array([Vector2(30, 2), Vector2(4, 2), Vector2(-46, 40), Vector2(-12, 40)])
+	wing.color = accent
 	n.add_child(wing)
 	# Двигатель под крылом.
 	var engine := Polygon2D.new()
-	engine.polygon = PackedVector2Array([Vector2(-18, 18), Vector2(-2, 18), Vector2(0, 30), Vector2(-20, 30)])
-	engine.color = Color("4A535F")
+	engine.polygon = PackedVector2Array([Vector2(-20, 24), Vector2(-2, 24), Vector2(2, 40), Vector2(-22, 40)])
+	engine.color = Color("33383F")
 	n.add_child(engine)
-	# Фюзеляж.
-	var body := Polygon2D.new()
-	body.polygon = PackedVector2Array([Vector2(-80, 0), Vector2(-66, -15), Vector2(50, -15), Vector2(80, -5), Vector2(82, 3), Vector2(58, 11), Vector2(-66, 11)])
-	body.color = Color(col)
-	n.add_child(body)
-	# Киль (вертикальное оперение) + стабилизатор.
-	var fin := Polygon2D.new()
-	fin.polygon = PackedVector2Array([Vector2(-80, -13), Vector2(-94, -40), Vector2(-74, -15), Vector2(-64, -15)])
-	fin.color = Color("3B5B8C")
-	n.add_child(fin)
-	var stab := Polygon2D.new()
-	stab.polygon = PackedVector2Array([Vector2(-66, -4), Vector2(-92, -2), Vector2(-72, 2)])
-	stab.color = dk
-	n.add_child(stab)
-	# Полоса по борту + иллюминаторы.
+	# Полоса по борту + иллюминаторы + кабина.
 	var stripe := Polygon2D.new()
-	stripe.polygon = PackedVector2Array([Vector2(-64, 1), Vector2(58, 1), Vector2(58, 5), Vector2(-64, 5)])
-	stripe.color = Color("3B5B8C")
+	stripe.polygon = PackedVector2Array([Vector2(-64, 0), Vector2(60, 0), Vector2(60, 5), Vector2(-64, 5)])
+	stripe.color = accent
 	n.add_child(stripe)
 	for i in range(8):
 		var w := Polygon2D.new()
-		w.polygon = _circle_polygon(3.0, 10); w.position = Vector2(-52 + i * 13, -4)
+		w.polygon = _circle_polygon(3.0, 10); w.position = Vector2(-52 + i * 13, -5)
 		w.color = Color("2A3550")
 		n.add_child(w)
-	# Кабинные стёкла (нос).
 	var cockpit := Polygon2D.new()
-	cockpit.polygon = PackedVector2Array([Vector2(60, -8), Vector2(74, -4), Vector2(60, -1)])
+	cockpit.polygon = PackedVector2Array([Vector2(62, -9), Vector2(78, -4), Vector2(62, -1)])
 	cockpit.color = Color("2A3550")
 	n.add_child(cockpit)
 	return n
