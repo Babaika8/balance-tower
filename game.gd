@@ -2356,15 +2356,20 @@ func _airport_sky_respawn(p: Dictionary) -> void:
 	# Самолёт в небе ВНУТРИ окна: садится (сверху вниз к горизонту, скрывается за
 	# зданием) или взлетает (от горизонта вверх). Движение почти вертикальное со
 	# слабым сносом вбок — НЕ вылетает за раму окна.
-	var inner: float = p["hx"] - 200.0
-	p["x"] = randf_range(-inner, inner) * 0.7
-	p["vx"] = randf_range(-26.0, 26.0)
+	# Плавный ДИАГОНАЛЬНЫЙ заход: медленно, по пологой траектории (и вбок, и вниз/вверх),
+	# приземляется/взлетает, скрываясь за зданием. vx сопоставим с vy → реальная диагональ.
+	var dir_x: float = -1.0 if randf() < 0.5 else 1.0
+	p["vx"] = dir_x * randf_range(30.0, 46.0)
 	if randf() < 0.55:
-		p["y"] = p["top"] + randf_range(16.0, 50.0)     # старт высоко
-		p["vy"] = randf_range(40.0, 58.0)               # снижается → садится за здание
+		# заход на посадку: старт высоко на стороне, ОТКУДА летим, плавно вниз-через-поле
+		p["x"] = -dir_x * randf_range(160.0, 320.0)
+		p["y"] = p["top"] + randf_range(18.0, 56.0)
+		p["vy"] = randf_range(18.0, 28.0)               # пологое снижение
 	else:
-		p["y"] = p["horizon"] - randf_range(16.0, 46.0) # старт у горизонта (из-за здания)
-		p["vy"] = -randf_range(36.0, 52.0)              # набирает высоту (взлёт)
+		# взлёт: старт у горизонта (из-за здания), плавно вверх-через-поле
+		p["x"] = -dir_x * randf_range(120.0, 280.0)
+		p["y"] = p["horizon"] - randf_range(16.0, 40.0)
+		p["vy"] = -randf_range(18.0, 28.0)              # пологий набор высоты
 
 func _airport_floor() -> Node2D:
 	# Пол зала: плитка в шашечку от низа окна ВНИЗ ДО травалатора (по нему идут люди),
@@ -2532,7 +2537,7 @@ func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
 	var accent := Color("2C5FA6")        # яркий акцент: крылья, киль, полоса
 	# Шасси (только у наземных): стойки + колёса.
 	if show_gear:
-		for gx in [52.0, -8.0, 8.0]:
+		for gx in [52.0, 8.0]:
 			var strut := Polygon2D.new()
 			strut.polygon = PackedVector2Array([Vector2(gx-1.6, 9), Vector2(gx+1.6, 9), Vector2(gx+1.6, 23), Vector2(gx-1.6, 23)])
 			strut.color = Color("3A3F47")
@@ -2546,9 +2551,13 @@ func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
 	body.polygon = PackedVector2Array([Vector2(-82, 0), Vector2(-66, -16), Vector2(52, -16), Vector2(84, -5), Vector2(86, 4), Vector2(60, 12), Vector2(-66, 12)])
 	body.color = Color(col)
 	n.add_child(body)
-	# КИЛЬ (вертикальный хвост) — крупный, акцентный, хорошо видно.
+	# КИЛЬ (хвост) — сросся с фюзеляжем (широкое основание на корпусе), верх ЗАКРУГЛЁН,
+	# как кончик крыла; не висит в воздухе.
 	var fin := Polygon2D.new()
-	fin.polygon = PackedVector2Array([Vector2(-82, -14), Vector2(-104, -54), Vector2(-86, -54), Vector2(-64, -16)])
+	fin.polygon = PackedVector2Array([
+		Vector2(-56, -15), Vector2(-80, -14),
+		Vector2(-94, -44), Vector2(-96, -49), Vector2(-93, -53), Vector2(-88, -54), Vector2(-84, -50),
+		Vector2(-72, -34), Vector2(-58, -16)])
 	fin.color = accent
 	n.add_child(fin)
 	# ГЛАВНОЕ крыло — широкое у тела самолёта, к концу плавно сужается (без чёрного
