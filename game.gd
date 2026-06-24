@@ -2541,11 +2541,6 @@ func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
 			wheel.polygon = _circle_polygon(5.0, 12); wheel.position = Vector2(gx, 25)
 			wheel.color = Color("181A1F")
 			n.add_child(wheel)
-	# ЗАДНЕЕ крыло (дальнее) — рисуем за фюзеляжем, чуть бледнее, для объёма.
-	var wing_far := Polygon2D.new()
-	wing_far.polygon = PackedVector2Array([Vector2(20, -2), Vector2(0, -2), Vector2(-30, 16), Vector2(-8, 16)])
-	wing_far.color = accent.lightened(0.22)
-	n.add_child(wing_far)
 	# Фюзеляж.
 	var body := Polygon2D.new()
 	body.polygon = PackedVector2Array([Vector2(-82, 0), Vector2(-66, -16), Vector2(52, -16), Vector2(84, -5), Vector2(86, 4), Vector2(60, 12), Vector2(-66, 12)])
@@ -2556,21 +2551,12 @@ func _airport_plane(col: String, sc: float, show_gear: bool = true) -> Node2D:
 	fin.polygon = PackedVector2Array([Vector2(-82, -14), Vector2(-104, -54), Vector2(-86, -54), Vector2(-64, -16)])
 	fin.color = accent
 	n.add_child(fin)
-	# Горизонтальный стабилизатор на хвосте.
-	var stab := Polygon2D.new()
-	stab.polygon = PackedVector2Array([Vector2(-70, -8), Vector2(-100, -16), Vector2(-96, -8), Vector2(-70, -2)])
-	stab.color = accent
-	n.add_child(stab)
-	# ГЛАВНОЕ (ближнее) крыло — крупное, массивное, акцентным цветом, свисает вниз-назад.
+	# ГЛАВНОЕ крыло — широкое у тела самолёта, к концу плавно сужается (без чёрного
+	# двигателя и без лишних мелких крылышек).
 	var wing := Polygon2D.new()
-	wing.polygon = PackedVector2Array([Vector2(30, 2), Vector2(4, 2), Vector2(-46, 40), Vector2(-12, 40)])
+	wing.polygon = PackedVector2Array([Vector2(34, 2), Vector2(-2, 2), Vector2(-34, 34), Vector2(-44, 40), Vector2(-38, 42), Vector2(-24, 38)])
 	wing.color = accent
 	n.add_child(wing)
-	# Двигатель под крылом.
-	var engine := Polygon2D.new()
-	engine.polygon = PackedVector2Array([Vector2(-20, 24), Vector2(-2, 24), Vector2(2, 40), Vector2(-22, 40)])
-	engine.color = Color("33383F")
-	n.add_child(engine)
 	# Полоса по борту + иллюминаторы + кабина.
 	var stripe := Polygon2D.new()
 	stripe.polygon = PackedVector2Array([Vector2(-64, 0), Vector2(60, 0), Vector2(60, 5), Vector2(-64, 5)])
