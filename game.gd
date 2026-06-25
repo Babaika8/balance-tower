@@ -963,12 +963,13 @@ func _setup_ui() -> void:
 	continue_btn.text = "▶  Продолжить"
 	continue_btn.add_theme_font_override("font", bold)
 	continue_btn.add_theme_font_size_override("font_size", 30)
-	continue_btn.custom_minimum_size = Vector2(360, 86)
-	continue_btn.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
-	continue_btn.offset_left = -180
-	continue_btn.offset_right = 180
-	continue_btn.offset_top = 150
-	continue_btn.offset_bottom = 236
+	continue_btn.custom_minimum_size = Vector2(380, 96)
+	# Внизу по центру (в зоне трёх кнопок-помощников), чтобы НЕ перекрывать лидерборд.
+	continue_btn.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
+	continue_btn.offset_left = -190
+	continue_btn.offset_right = 190
+	continue_btn.offset_top = -150
+	continue_btn.offset_bottom = -54
 	continue_btn.focus_mode = Control.FOCUS_NONE
 	continue_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var cbs := StyleBoxFlat.new()
@@ -1097,6 +1098,7 @@ func _update_boost_buttons() -> void:
 		var d: Dictionary = boost_btns[i]
 		var b: Button = d["button"]
 		b.position = Vector2(x0 + i * step, vr.y - 132.0)
+		b.visible = state != State.GAME_OVER        # на гейм-овере прячем (там «Продолжить»)
 		var armed := false
 		if d["kind"] == "slow":
 			armed = slow_until_ms > Time.get_ticks_msec()
