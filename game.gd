@@ -1019,16 +1019,16 @@ func _arm_boost(kind: String, cost: int) -> void:
 	_save_coins()
 
 func _stabilize_tower() -> void:
-	# Выпрямляем каждый блок, подсвечиваем голубым и держим башню застывшей 1 сек.
+	# НЕ замораживаем — мягко УСПОКАИВАЕМ раскачку: гасим скорости и временно повышаем
+	# демпфирование, чтобы башня плавно «улеглась», а не застыла на месте.
 	for s in stones:
 		if is_instance_valid(s):
-			s.linear_velocity = Vector2.ZERO
-			s.angular_velocity = 0.0
-			s.rotation = 0.0
-			s.freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
-			s.freeze = true
-			s.modulate = Color("9FCBFF")          # «заморожено» — голубая подсветка
-	get_tree().create_timer(1.0).timeout.connect(_unfreeze_tower)
+			s.linear_velocity *= 0.4
+			s.angular_velocity *= 0.25
+			s.angular_damp = 14.0
+			s.linear_damp = 6.0
+			s.modulate = Color("BFE0FF")          # лёгкая голубая подсветка «успокоения»
+	get_tree().create_timer(1.8).timeout.connect(_unfreeze_tower)
 	# Большая вспышка-кольцо по башне.
 	var ring := Polygon2D.new()
 	ring.polygon = _circle_polygon(70, 28)
@@ -1044,9 +1044,11 @@ func _stabilize_tower() -> void:
 	tw.tween_callback(ring.queue_free)
 
 func _unfreeze_tower() -> void:
+	# Возвращаем обычное демпфирование (как при спавне блока) и снимаем подсветку.
 	for s in stones:
 		if is_instance_valid(s):
-			s.freeze = false
+			s.angular_damp = 0.4
+			s.linear_damp = 0.3
 			s.modulate = Color(1, 1, 1)
 
 func _tint_carrier(c: Color) -> void:
