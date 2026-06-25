@@ -97,6 +97,12 @@ var coins: int = 0
 var coins_label: Label
 var last_placed: RigidBody2D = null   # предыдущий уложенный блок (для Perfect/Магнита)
 var carrier_speed_mult: float = 1.0
+# «Продолжить игру» — снимок последнего стабильного состояния башни (на момент дропа).
+var continue_btn: Button
+var stable_snapshot: Array = []       # [{stone, pos, rot}]
+var stable_score: int = 0
+var stable_top_y: float = 0.0
+var stable_last_placed: RigidBody2D = null
 var slow_until_ms: int = 0
 var boost_btns: Array = []            # [{button, kind, cost}]
 const PERFECT_THRESH := 16.0
@@ -952,6 +958,30 @@ func _setup_ui() -> void:
 		layer.add_child(b)
 		boost_btns.append({"button": b, "kind": d["kind"], "cost": int(d["cost"])})
 
+	# Кнопка «Продолжить игру» на гейм-овере (визуал; тап ловим в _unhandled_input).
+	continue_btn = Button.new()
+	continue_btn.text = "▶  Продолжить"
+	continue_btn.add_theme_font_override("font", bold)
+	continue_btn.add_theme_font_size_override("font_size", 30)
+	continue_btn.custom_minimum_size = Vector2(360, 86)
+	continue_btn.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	continue_btn.offset_left = -180
+	continue_btn.offset_right = 180
+	continue_btn.offset_top = 150
+	continue_btn.offset_bottom = 236
+	continue_btn.focus_mode = Control.FOCUS_NONE
+	continue_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var cbs := StyleBoxFlat.new()
+	cbs.bg_color = Color("2E7D4F", 0.95)
+	cbs.border_color = Color("BFF0CF")
+	cbs.set_border_width_all(3)
+	cbs.set_corner_radius_all(22)
+	cbs.set_content_margin_all(8)
+	continue_btn.add_theme_stylebox_override("normal", cbs)
+	continue_btn.add_theme_color_override("font_color", Color("FBF4E8"))
+	continue_btn.visible = false
+	layer.add_child(continue_btn)
+
 	_update_score()
 	_update_coins()
 
@@ -1226,9 +1256,20 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.WAITING and carrier:
 		_drop()
 	elif state == State.GAME_OVER:
-		_restart()
+		if pos.x >= 0.0 and continue_btn and continue_btn.visible and continue_btn.get_global_rect().has_point(pos):
+			_continue_game()
+		else:
+			_restart()
 
 func _drop() -> void:
+	# Снимок последнего СТАБИЛЬНОГО состояния (башня до этого броска) — для «Продолжить».
+	stable_snapshot.clear()
+	for s in stones:
+		if is_instance_valid(s) and s.get_meta("placed", false):
+			stable_snapshot.append({"stone": s, "pos": s.global_position, "rot": s.rotation})
+	stable_score = score
+	stable_top_y = top_y
+	stable_last_placed = last_placed
 	var color: Color = carrier.get_meta("stone_color")
 	var idx: int = carrier.get_meta("stone_idx")
 	var magnet: bool = carrier.get_meta("magnet", false)
@@ -1301,6 +1342,9 @@ func _game_over(at: Vector2) -> void:
 	msg_label.text = _gameover_text("")
 	msg_label.visible = true
 	msg_scrim.visible = true
+	# Кнопка «Продолжить» — если есть стабильный снимок (хотя бы один блок в башне).
+	if continue_btn:
+		continue_btn.visible = stable_snapshot.size() > 0
 	# Веб (Telegram): отправить счёт и подтянуть топ-10.
 	if OS.has_feature("web"):
 		msg_label.text = "Башня упала!\nВысота: %d\n\nЗагружаю рекорды…" % score
@@ -1347,9 +1391,48 @@ func _restart() -> void:
 	slow_until_ms = 0
 	msg_label.visible = false
 	msg_scrim.visible = false
+	if continue_btn:
+		continue_btn.visible = false
+	stable_snapshot.clear()
 	_update_score()
 	camera.position.y = top_y - 150.0
 	_spawn_carrier()
+
+func _continue_game() -> void:
+	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
+	# возвращаем остальные на сохранённые места и мягко успокаиваем башню.
+	var keep := {}
+	for e in stable_snapshot:
+		keep[e["stone"]] = true
+	for s in stones.duplicate():
+		if not keep.has(s):
+			if is_instance_valid(s):
+				s.queue_free()
+			stones.erase(s)
+	for e in stable_snapshot:
+		var s: RigidBody2D = e["stone"]
+		if is_instance_valid(s):
+			s.freeze = false
+			s.global_position = e["pos"]
+			s.rotation = e["rot"]
+			s.linear_velocity = Vector2.ZERO
+			s.angular_velocity = 0.0
+			s.set_meta("placed", true)
+			s.set_meta("min_y", e["pos"].y)
+	score = stable_score
+	top_y = stable_top_y
+	last_placed = stable_last_placed if is_instance_valid(stable_last_placed) else null
+	current_stone = null
+	loading_lb = false
+	carrier_speed_mult = 1.0
+	slow_until_ms = 0
+	msg_label.visible = false
+	msg_scrim.visible = false
+	if continue_btn:
+		continue_btn.visible = false
+	_update_score()
+	_spawn_carrier()                 # ставит state = WAITING
+	_stabilize_tower()               # мягкая страховка, чтобы не сложилась сразу
 
 func _update_score() -> void:
 	score_label.text = "Высота: %d" % score
