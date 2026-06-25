@@ -30,6 +30,8 @@ var carrier_dir: float = 1.0
 var current_stone: RigidBody2D = null
 var stones: Array[RigidBody2D] = []
 var loading_lb: bool = false
+var ad_pending: bool = false       # ждём результат rewarded-рекламы AdsGram
+var ad_started_ms: int = 0         # для таймаута, если SDK не ответил
 var last_action_ms: int = 0
 var theme: Dictionary = {}
 
@@ -960,7 +962,7 @@ func _setup_ui() -> void:
 
 	# Кнопка «Продолжить игру» на гейм-овере (визуал; тап ловим в _unhandled_input).
 	continue_btn = Button.new()
-	continue_btn.text = "▶  Продолжить"
+	continue_btn.text = "📺  Продолжить"
 	continue_btn.add_theme_font_override("font", bold)
 	continue_btn.add_theme_font_size_override("font_size", 30)
 	continue_btn.custom_minimum_size = Vector2(380, 96)
@@ -1187,6 +1189,8 @@ func _spawn_carrier() -> void:
 func _process(delta: float) -> void:
 	if loading_lb:
 		_poll_leaderboard()
+	if ad_pending:
+		_poll_ad()
 	if slow_until_ms > 0 and Time.get_ticks_msec() > slow_until_ms:
 		slow_until_ms = 0
 		carrier_speed_mult = 1.0
@@ -1258,8 +1262,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if state == State.WAITING and carrier:
 		_drop()
 	elif state == State.GAME_OVER:
+		if ad_pending:
+			return                       # реклама грузится — игнорируем тапы
 		if pos.x >= 0.0 and continue_btn and continue_btn.visible and continue_btn.get_global_rect().has_point(pos):
-			_continue_game()
+			_request_continue_ad()
 		else:
 			_restart()
 
@@ -1387,6 +1393,7 @@ func _restart() -> void:
 	current_stone = null
 	score = 0
 	loading_lb = false
+	ad_pending = false
 	top_y = ground_top_y
 	last_placed = null
 	carrier_speed_mult = 1.0
@@ -1399,6 +1406,34 @@ func _restart() -> void:
 	_update_score()
 	camera.position.y = top_y - 150.0
 	_spawn_carrier()
+
+func _request_continue_ad() -> void:
+	# «Продолжить» = посмотреть rewarded-ролик AdsGram, затем восстановить башню.
+	# Вне Telegram/без SDK рекламы нет — продолжаем сразу (чтобы работало в редакторе/превью).
+	if not OS.has_feature("web"):
+		_continue_game()
+		return
+	ad_pending = true
+	ad_started_ms = Time.get_ticks_msec()
+	if continue_btn:
+		continue_btn.visible = false
+	msg_label.text = "Реклама…\nСейчас продолжим"
+	JavaScriptBridge.eval("window.BT_showAd && window.BT_showAd()", true)
+
+func _poll_ad() -> void:
+	var r = JavaScriptBridge.eval("window.BT_ad", true)
+	var res := str(r) if typeof(r) == TYPE_STRING else ""
+	# Таймаут-страховка: если SDK молчит дольше 25 с — считаем, что рекламы нет.
+	if res == "" and Time.get_ticks_msec() - ad_started_ms < 25000:
+		return
+	ad_pending = false
+	if res == "reward":
+		_continue_game()                 # ролик досмотрен — выдаём «жизнь»
+	else:
+		# Не досмотрел / нет показа / таймаут — награды нет, вернуть экран гейм-овера.
+		if continue_btn:
+			continue_btn.visible = stable_snapshot.size() > 0
+		msg_label.text = "Реклама недоступна\n\n▶ Тапни «Продолжить», чтобы попробовать ещё раз\nили тапни мимо — заново"
 
 func _continue_game() -> void:
 	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
@@ -1426,6 +1461,7 @@ func _continue_game() -> void:
 	last_placed = stable_last_placed if is_instance_valid(stable_last_placed) else null
 	current_stone = null
 	loading_lb = false
+	ad_pending = false
 	carrier_speed_mult = 1.0
 	slow_until_ms = 0
 	msg_label.visible = false
