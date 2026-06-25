@@ -962,7 +962,7 @@ func _setup_ui() -> void:
 
 	# Кнопка «Продолжить игру» на гейм-овере (визуал; тап ловим в _unhandled_input).
 	continue_btn = Button.new()
-	continue_btn.text = "📺  Продолжить"
+	continue_btn.text = "▶  Продолжить"
 	continue_btn.add_theme_font_override("font", bold)
 	continue_btn.add_theme_font_size_override("font_size", 30)
 	continue_btn.custom_minimum_size = Vector2(380, 96)
