@@ -32,6 +32,7 @@ var stones: Array[RigidBody2D] = []
 var loading_lb: bool = false
 var ad_pending: bool = false       # ждём результат rewarded-рекламы AdsGram
 var ad_started_ms: int = 0         # для таймаута, если SDK не ответил
+var continue_grace_until_ms: int = 0   # после «Продолжить» даём башне улечься без гейм-овера
 var last_action_ms: int = 0
 var dbg_lines: Array[String] = []   # ВРЕМЕННО: трейс рекламного флоу на экране
 var dbg_label: Label
@@ -1233,6 +1234,16 @@ func _process(delta: float) -> void:
 func _physics_process(_delta: float) -> void:
 	if state == State.GAME_OVER:
 		return
+	# Грейс после «Продолжить»: восстановленная башня ставится разом и на стыках
+	# получает толчок. Пока идёт грейс — не объявляем обвал, гасим раскачку и
+	# пере-базируем min_y, чтобы лёгкое оседание не засчиталось как падение.
+	if Time.get_ticks_msec() < continue_grace_until_ms:
+		for s in stones:
+			if is_instance_valid(s) and s.get_meta("placed", false):
+				s.angular_velocity = 0.0
+				s.linear_velocity *= 0.5
+				s.set_meta("min_y", s.global_position.y)
+		return
 	# Промах: летящий камень провалился мимо башни.
 	if is_instance_valid(current_stone) and not current_stone.get_meta("placed", false):
 		if current_stone.global_position.y > top_y + MISS_LIMIT:
@@ -1510,6 +1521,7 @@ func _continue_game() -> void:
 	_update_score()
 	_spawn_carrier()                 # ставит state = WAITING
 	_stabilize_tower()               # мягкая страховка, чтобы не сложилась сразу
+	continue_grace_until_ms = Time.get_ticks_msec() + 1600
 	_dbg("CONT out stones=%d state=%d score=%d" % [stones.size(), state, score])
 
 func _update_score() -> void:
