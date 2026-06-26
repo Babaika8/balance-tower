@@ -1423,17 +1423,24 @@ func _request_continue_ad() -> void:
 func _poll_ad() -> void:
 	var r = JavaScriptBridge.eval("window.BT_ad", true)
 	var res := str(r) if typeof(r) == TYPE_STRING else ""
-	# Таймаут-страховка: если SDK молчит дольше 25 с — считаем, что рекламы нет.
-	if res == "" and Time.get_ticks_msec() - ad_started_ms < 25000:
-		return
-	ad_pending = false
 	if res == "reward":
+		ad_pending = false
 		_continue_game()                 # ролик досмотрен — выдаём «жизнь»
-	else:
-		# Не досмотрел / нет показа / таймаут — награды нет, вернуть экран гейм-овера.
-		if continue_btn:
-			continue_btn.visible = stable_snapshot.size() > 0
-		msg_label.text = "Реклама недоступна\n\nТапни «Смотреть рекламу», чтобы попробовать ещё раз\nили тапни мимо — заново"
+		return
+	if res == "fail":
+		ad_pending = false
+		_ad_unavailable()                # закрыл досрочно / нет показа / нет SDK
+		return
+	# Пока SDK не ответил — ждём: rewarded-ролик идёт 30-60 с, и всё это время игра «заморожена».
+	# Прежний таймаут в 25 с рубил награду досрочно. Длинная страховка — только на случай зависания.
+	if Time.get_ticks_msec() - ad_started_ms > 180000:
+		ad_pending = false
+		_ad_unavailable()
+
+func _ad_unavailable() -> void:
+	if continue_btn:
+		continue_btn.visible = stable_snapshot.size() > 0
+	msg_label.text = "Реклама недоступна\n\nТапни «Смотреть рекламу», чтобы попробовать ещё раз\nили тапни мимо — заново"
 
 func _continue_game() -> void:
 	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
