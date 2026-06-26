@@ -962,15 +962,15 @@ func _setup_ui() -> void:
 
 	# Кнопка «Продолжить игру» на гейм-овере (визуал; тап ловим в _unhandled_input).
 	continue_btn = Button.new()
-	continue_btn.text = "▶  Смотреть рекламу"
+	continue_btn.text = "Смотреть рекламу\nи продолжить"
 	continue_btn.add_theme_font_override("font", bold)
-	continue_btn.add_theme_font_size_override("font_size", 30)
-	continue_btn.custom_minimum_size = Vector2(380, 96)
+	continue_btn.add_theme_font_size_override("font_size", 28)
+	continue_btn.custom_minimum_size = Vector2(380, 120)
 	# Внизу по центру (в зоне трёх кнопок-помощников), чтобы НЕ перекрывать лидерборд.
 	continue_btn.set_anchors_and_offsets_preset(Control.PRESET_CENTER_BOTTOM)
 	continue_btn.offset_left = -190
 	continue_btn.offset_right = 190
-	continue_btn.offset_top = -150
+	continue_btn.offset_top = -174
 	continue_btn.offset_bottom = -54
 	continue_btn.focus_mode = Control.FOCUS_NONE
 	continue_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -1362,9 +1362,7 @@ func _game_over(at: Vector2) -> void:
 func _gameover_text(board: String) -> String:
 	var t := "Башня упала!\nВысота: %d\n" % score
 	if board != "":
-		t += "\n🏆 Топ:\n" + board
-	if stable_snapshot.size() > 0:
-		t += "\n📺 «Смотреть рекламу» — продолжить с места обрыва.\nБудет показан рекламный ролик (AdsGram).\n"
+		t += "\nТоп:\n" + board
 	t += "\nТап — заново"
 	return t
 
@@ -1435,7 +1433,7 @@ func _poll_ad() -> void:
 		# Не досмотрел / нет показа / таймаут — награды нет, вернуть экран гейм-овера.
 		if continue_btn:
 			continue_btn.visible = stable_snapshot.size() > 0
-		msg_label.text = "Реклама недоступна\n\n▶ Тапни «Смотреть рекламу», чтобы попробовать ещё раз\nили тапни мимо — заново"
+		msg_label.text = "Реклама недоступна\n\nТапни «Смотреть рекламу», чтобы попробовать ещё раз\nили тапни мимо — заново"
 
 func _continue_game() -> void:
 	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
