@@ -1243,6 +1243,7 @@ func _physics_process(_delta: float) -> void:
 				s.angular_velocity = 0.0
 				s.linear_velocity *= 0.5
 				s.set_meta("min_y", s.global_position.y)
+				s.set_meta("rot_base", s.rotation)   # принимаем текущий угол как «нормальный»
 		return
 	# Промах: летящий камень провалился мимо башни.
 	if is_instance_valid(current_stone) and not current_stone.get_meta("placed", false):
@@ -1257,7 +1258,7 @@ func _physics_process(_delta: float) -> void:
 		if s.global_position.y < miny:
 			s.set_meta("min_y", s.global_position.y)
 			miny = s.global_position.y
-		if absf(s.rotation) > COLLAPSE_ANGLE or s.global_position.y > miny + COLLAPSE_DROP:
+		if absf(s.rotation - s.get_meta("rot_base", 0.0)) > COLLAPSE_ANGLE or s.global_position.y > miny + COLLAPSE_DROP:
 			_game_over(s.global_position)
 			return
 
@@ -1506,6 +1507,7 @@ func _continue_game() -> void:
 			s.angular_velocity = 0.0
 			s.set_meta("placed", true)
 			s.set_meta("min_y", e["pos"].y)
+			s.set_meta("rot_base", e["rot"])     # наклон меряем от восстановленного угла, не от вертикали
 	score = stable_score
 	top_y = stable_top_y
 	last_placed = stable_last_placed if is_instance_valid(stable_last_placed) else null
