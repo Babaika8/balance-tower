@@ -33,6 +33,8 @@ var loading_lb: bool = false
 var ad_pending: bool = false       # ждём результат rewarded-рекламы AdsGram
 var ad_started_ms: int = 0         # для таймаута, если SDK не ответил
 var last_action_ms: int = 0
+var dbg_lines: Array[String] = []   # ВРЕМЕННО: трейс рекламного флоу на экране
+var dbg_label: Label
 var theme: Dictionary = {}
 
 var camera: Camera2D
@@ -890,6 +892,19 @@ func _setup_ui() -> void:
 	msg_label.visible = false
 	layer.add_child(msg_label)
 
+	# ВРЕМЕННО: трейс рекламного флоу (жёлтый текст вверху-слева).
+	dbg_label = Label.new()
+	dbg_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	dbg_label.offset_top = 120
+	dbg_label.offset_left = 12
+	dbg_label.add_theme_font_override("font", bold)
+	dbg_label.add_theme_font_size_override("font_size", 22)
+	dbg_label.add_theme_color_override("font_color", Color("FFD24A"))
+	dbg_label.add_theme_constant_override("outline_size", 6)
+	dbg_label.add_theme_color_override("font_outline_color", Color("000000"))
+	dbg_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	layer.add_child(dbg_label)
+
 	# Кнопка смены скина (верх-право), стилизованная «пилюля» под тему скина.
 	skin_button = Button.new()
 	skin_button.text = SKIN_NAMES[skin]
@@ -1345,6 +1360,7 @@ func _on_stone_contact(_body: Node, stone: RigidBody2D) -> void:
 
 func _game_over(at: Vector2) -> void:
 	state = State.GAME_OVER
+	_dbg("GAMEOVER score=%d" % score)
 	_save_coins()
 	_puff(at)
 	if carrier:
@@ -1410,6 +1426,13 @@ func _restart() -> void:
 	camera.position.y = top_y - 150.0
 	_spawn_carrier()
 
+func _dbg(s: String) -> void:
+	dbg_lines.append("%0.1f %s" % [Time.get_ticks_msec() / 1000.0, s])
+	while dbg_lines.size() > 12:
+		dbg_lines.pop_front()
+	if dbg_label:
+		dbg_label.text = "\n".join(dbg_lines)
+
 func _request_continue_ad() -> void:
 	# «Продолжить» = посмотреть rewarded-ролик AdsGram, затем восстановить башню.
 	# Вне Telegram/без SDK рекламы нет — продолжаем сразу (чтобы работало в редакторе/превью).
@@ -1421,16 +1444,19 @@ func _request_continue_ad() -> void:
 	if continue_btn:
 		continue_btn.visible = false
 	msg_label.text = "Реклама…\nСейчас продолжим"
+	_dbg("showAd snap=%d" % stable_snapshot.size())
 	JavaScriptBridge.eval("window.BT_showAd && window.BT_showAd()", true)
 
 func _poll_ad() -> void:
 	var r = JavaScriptBridge.eval("window.BT_ad", true)
 	var res := str(r) if typeof(r) == TYPE_STRING else ""
 	if res.begins_with("reward"):
+		_dbg("res=reward")
 		ad_pending = false
 		_continue_game()                 # ролик досмотрен — выдаём «жизнь»
 		return
 	if res.begins_with("fail"):
+		_dbg("res=%s" % res)
 		ad_pending = false
 		_ad_unavailable(res)             # закрыл досрочно / нет показа / нет SDK
 		return
@@ -1441,6 +1467,7 @@ func _poll_ad() -> void:
 		_ad_unavailable("timeout")
 
 func _ad_unavailable(reason := "") -> void:
+	_dbg("UNAVAIL %s" % reason)
 	if continue_btn:
 		continue_btn.visible = stable_snapshot.size() > 0
 	var dbg := "\n[%s]" % reason if reason != "" else ""
@@ -1449,6 +1476,7 @@ func _ad_unavailable(reason := "") -> void:
 func _continue_game() -> void:
 	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
 	# возвращаем остальные на сохранённые места и мягко успокаиваем башню.
+	_dbg("CONT in snap=%d stones=%d" % [stable_snapshot.size(), stones.size()])
 	var keep := {}
 	for e in stable_snapshot:
 		keep[e["stone"]] = true
@@ -1482,6 +1510,7 @@ func _continue_game() -> void:
 	_update_score()
 	_spawn_carrier()                 # ставит state = WAITING
 	_stabilize_tower()               # мягкая страховка, чтобы не сложилась сразу
+	_dbg("CONT out stones=%d state=%d score=%d" % [stones.size(), state, score])
 
 func _update_score() -> void:
 	score_label.text = "Высота: %d" % score
