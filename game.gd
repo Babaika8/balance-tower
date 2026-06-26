@@ -1476,7 +1476,7 @@ func _poll_ad() -> void:
 	# Прежний таймаут в 25 с рубил награду досрочно. Длинная страховка — только на случай зависания.
 	if Time.get_ticks_msec() - ad_started_ms > 180000:
 		ad_pending = false
-		_ad_unavailable("timeout")
+		_ad_unavailable()
 
 func _ad_unavailable() -> void:
 	if continue_btn:
