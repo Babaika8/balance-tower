@@ -876,6 +876,9 @@ func _setup_ui() -> void:
 
 	msg_label = Label.new()
 	msg_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	msg_label.offset_left = 28
+	msg_label.offset_right = -28
+	msg_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART   # переносим длинные строки, чтобы не уезжали за экран
 	msg_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	msg_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	msg_label.add_theme_font_override("font", bold)
