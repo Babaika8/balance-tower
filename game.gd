@@ -962,7 +962,7 @@ func _setup_ui() -> void:
 
 	# Кнопка «Продолжить игру» на гейм-овере (визуал; тап ловим в _unhandled_input).
 	continue_btn = Button.new()
-	continue_btn.text = "▶  Продолжить"
+	continue_btn.text = "▶  Смотреть рекламу"
 	continue_btn.add_theme_font_override("font", bold)
 	continue_btn.add_theme_font_size_override("font_size", 30)
 	continue_btn.custom_minimum_size = Vector2(380, 96)
@@ -1363,6 +1363,8 @@ func _gameover_text(board: String) -> String:
 	var t := "Башня упала!\nВысота: %d\n" % score
 	if board != "":
 		t += "\n🏆 Топ:\n" + board
+	if stable_snapshot.size() > 0:
+		t += "\n📺 «Смотреть рекламу» — продолжить с места обрыва.\nБудет показан рекламный ролик (AdsGram).\n"
 	t += "\nТап — заново"
 	return t
 
@@ -1433,7 +1435,7 @@ func _poll_ad() -> void:
 		# Не досмотрел / нет показа / таймаут — награды нет, вернуть экран гейм-овера.
 		if continue_btn:
 			continue_btn.visible = stable_snapshot.size() > 0
-		msg_label.text = "Реклама недоступна\n\n▶ Тапни «Продолжить», чтобы попробовать ещё раз\nили тапни мимо — заново"
+		msg_label.text = "Реклама недоступна\n\n▶ Тапни «Смотреть рекламу», чтобы попробовать ещё раз\nили тапни мимо — заново"
 
 func _continue_game() -> void:
 	# Возобновляем с последнего стабильного состояния: убираем упавший/лишний блок,
