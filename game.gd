@@ -35,8 +35,8 @@ var ad_pending: bool = false       # ждём результат rewarded-рек
 var ad_started_ms: int = 0         # для таймаута, если SDK не ответил
 var continue_grace_until_ms: int = 0   # после «Продолжить» даём башне улечься без гейм-овера
 var last_action_ms: int = 0
-var _zen_stone_tex_cache: Texture2D = null   # PNG-текстура камня Дзен (если есть)
-var _zen_stone_tex_loaded := false
+var _zen_stone_texs: Array = []              # PNG-текстуры камней Дзен (3 вида, если есть)
+var _zen_stone_texs_loaded := false
 var dbg_label: Label                # ВРЕМЕННО: HUD позиций для отладки продолжения
 var _dbg_cont: String = ""          # ВРЕМЕННО: данные последнего продолжения
 var _dbg_snap: String = ""          # ВРЕМЕННО: данные последнего снимка
@@ -3139,18 +3139,20 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 	return p
 
 # Дзен-камень 3 видов: 0 гладкий серый, 1 тёмный базальт с прожилкой, 2 песчаник с мхом.
-func _zen_stone_tex() -> Texture2D:
-	if not _zen_stone_tex_loaded:
-		_zen_stone_tex_loaded = true
-		var p := "res://assets/zen/stone_px.png"
-		if ResourceLoader.exists(p):
-			_zen_stone_tex_cache = load(p)
-	return _zen_stone_tex_cache
+func _zen_stone_texs_get() -> Array:
+	if not _zen_stone_texs_loaded:
+		_zen_stone_texs_loaded = true
+		for p in ["res://assets/zen/stone_px.png", "res://assets/zen/stone_px2.png", "res://assets/zen/stone_px3.png"]:
+			if ResourceLoader.exists(p):
+				_zen_stone_texs.append(load(p))
+	return _zen_stone_texs
 
 func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
-	# Если есть PNG-спрайт (пиксель-арт от GPT) — рисуем его под размер блока.
-	var tex := _zen_stone_tex()
-	if tex:
+	# Если есть PNG-спрайты (пиксель-арт от GPT) — рисуем их под размер блока, по idx.
+	var texs := _zen_stone_texs_get()
+	if texs.size() > 0:
+		var ti: int = (idx if idx >= 0 else 0) % texs.size()
+		var tex: Texture2D = texs[ti]
 		var nt := Node2D.new()
 		var spr := Sprite2D.new()
 		spr.texture = tex
