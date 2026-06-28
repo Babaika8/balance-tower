@@ -254,6 +254,17 @@ func _setup_background() -> void:
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(sky)
 
+	# Пиксель-арт дальний горизонт (сакура-горы) — поверх неба-градиента, у линии леса.
+	var hz := _tex("res://assets/zen/horizon_px.png")
+	if hz:
+		var hsp := Sprite2D.new()
+		hsp.texture = hz
+		hsp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var hsc := BASE_W / float(hz.get_width()) * 1.12   # чуть шире экрана
+		hsp.scale = Vector2(hsc, hsc)
+		hsp.position = Vector2(base_x, 648.0)
+		layer.add_child(hsp)
+
 	# Звёзды (видны ночью). Хранят нормированный x (0..1) — раскладка под ширину экрана.
 	for i in range(30):
 		var st := Polygon2D.new()
