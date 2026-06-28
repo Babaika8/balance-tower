@@ -194,6 +194,7 @@ func _auto_shot() -> void:
 # по бокам). Передний план — отдельные деревья, приклеенные к краям вьюпорта.
 const SCENE_SCALE := 1.08
 const NEAR_SCALE := 0.62
+const ZEN_PIXEL_BG := true   # Дзен: цельный пиксель-арт задник вместо векторной сцены
 const FAR_ART_W := 2400.0   # ширина канваса дальнего слоя (для неба над ним)
 
 func _setup_background() -> void:
@@ -254,17 +255,6 @@ func _setup_background() -> void:
 	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	layer.add_child(sky)
 
-	# Пиксель-арт дальний горизонт (сакура-горы) — поверх неба-градиента, у линии леса.
-	var hz := _tex("res://assets/zen/horizon_px.png")
-	if hz:
-		var hsp := Sprite2D.new()
-		hsp.texture = hz
-		hsp.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var hsc := BASE_W / float(hz.get_width()) * 1.12   # чуть шире экрана
-		hsp.scale = Vector2(hsc, hsc)
-		hsp.position = Vector2(base_x, 648.0)
-		layer.add_child(hsp)
-
 	# Звёзды (видны ночью). Хранят нормированный x (0..1) — раскладка под ширину экрана.
 	for i in range(30):
 		var st := Polygon2D.new()
@@ -306,51 +296,58 @@ func _setup_background() -> void:
 		atmo_birds.append({"node": bird, "nx": randf(), "speed": randf_range(0.022, 0.036),
 				"ny": randf_range(120, 460)})
 
-	# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
-	# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
-	# nx у ёлок — только края (центр свободен под камни).
+	if ZEN_PIXEL_BG:
+		# Цельный пиксель-арт задник (сакура-горы + лес + пагода + земля) — параллакс-слой.
+		var scn := _tex("res://assets/zen/scene_px.png")
+		if scn:
+			var ssc := BASE_W / float(scn.get_width()) * 1.12
+			_add_bg_layer(scn, -90, 0.45, 1080.0, "center", ssc, false)
+	else:
+		# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
+		# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
+		# nx у ёлок — только края (центр свободен под камни).
 
-	# --- ДАЛЬНИЙ ПЛАН: далёкие горы (за лесом) + много сакур-облаков ---
-	_add_dune(layer, 96.0, 4, 71, 706.0, 0.08, -0.24)   # дальняя гряда гор
-	_add_dune(layer, 70.0, 5, 73, 730.0, 0.11, -0.12)   # ближняя гряда
-	for i in range(9):
-		var puff := _make_sakura_puff(randf_range(1.2, 1.8))
-		layer.add_child(puff)
-		atmo_props.append({"node": puff, "nx": 0.04 + i * 0.115 + randf_range(-0.02, 0.02), "base_y": 700.0, "factor": 0.12})
-		_attach_sway(puff, randf_range(0.01, 0.022), randf_range(2.6, 4.0))
-	var forest := _make_forest_row()
-	layer.add_child(forest)
-	atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.50})
+		# --- ДАЛЬНИЙ ПЛАН: далёкие горы (за лесом) + много сакур-облаков ---
+		_add_dune(layer, 96.0, 4, 71, 706.0, 0.08, -0.24)   # дальняя гряда гор
+		_add_dune(layer, 70.0, 5, 73, 730.0, 0.11, -0.12)   # ближняя гряда
+		for i in range(9):
+			var puff := _make_sakura_puff(randf_range(1.2, 1.8))
+			layer.add_child(puff)
+			atmo_props.append({"node": puff, "nx": 0.04 + i * 0.115 + randf_range(-0.02, 0.02), "base_y": 700.0, "factor": 0.12})
+			_attach_sway(puff, randf_range(0.01, 0.022), randf_range(2.6, 4.0))
+		var forest := _make_forest_row()
+		layer.add_child(forest)
+		atmo_dunes.append({"node": forest, "base_y": 726.0, "factor": 0.16, "shade": 0.50})
 
-	# --- СРЕДНИЙ ПЛАН: волны земли (сглаженные гребни); дома/ёлки сидят на земле,
-	# фундамент уходит за свою волну. Дома и ёлки разнесены по X (не слипаются). ---
-	_add_dune(layer, 26.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
-	# мелкие дальние ёлки (плотность у горизонта, по бокам от центра)
-	_add_fir(layer, 0.34, 800.0, 1.1, 0.30)
-	_add_fir(layer, 0.64, 805.0, 1.2, 0.30)
-	_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.18)  # волна 3
-	# ПРАВЫЙ дом + правые краевые ёлки — фундамент за волну 2
-	var rhouse := _make_house(1.7)
-	layer.add_child(rhouse)
-	atmo_props.append({"node": rhouse, "nx": 0.70, "base_y": 905.0, "factor": 0.44})
-	_add_chimney_smoke(rhouse)
-	_add_fir(layer, 0.80, 905.0, 1.7, 0.44)
-	_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
-	_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
-	_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.32)  # волна 2 (закрывает фундамент правого дома)
-	# ЛЕВЫЙ дом + левые краевые ёлки — фундамент за переднюю волну 1
-	var lhouse := _make_house(2.4)
-	layer.add_child(lhouse)
-	atmo_props.append({"node": lhouse, "nx": 0.30, "base_y": 1018.0, "factor": 0.60})
-	_add_chimney_smoke(lhouse)
-	_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
-	_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
-	_add_fir(layer, 0.22, 1028.0, 1.8, 0.60)
-	_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.46) # волна 1 (передняя, тёмная — контраст/глубина)
+		# --- СРЕДНИЙ ПЛАН: волны земли (сглаженные гребни); дома/ёлки сидят на земле,
+		# фундамент уходит за свою волну. Дома и ёлки разнесены по X (не слипаются). ---
+		_add_dune(layer, 26.0, 7, 3, 760.0, 0.18, 0.00)   # волна 4 (дальняя)
+		# мелкие дальние ёлки (плотность у горизонта, по бокам от центра)
+		_add_fir(layer, 0.34, 800.0, 1.1, 0.30)
+		_add_fir(layer, 0.64, 805.0, 1.2, 0.30)
+		_add_dune(layer, 32.0, 8, 16, 840.0, 0.30, 0.18)  # волна 3
+		# ПРАВЫЙ дом + правые краевые ёлки — фундамент за волну 2
+		var rhouse := _make_house(1.7)
+		layer.add_child(rhouse)
+		atmo_props.append({"node": rhouse, "nx": 0.70, "base_y": 905.0, "factor": 0.44})
+		_add_chimney_smoke(rhouse)
+		_add_fir(layer, 0.80, 905.0, 1.7, 0.44)
+		_add_fir(layer, 0.88, 918.0, 2.1, 0.44)
+		_add_fir(layer, 0.96, 905.0, 2.4, 0.44)
+		_add_dune(layer, 30.0, 9, 29, 930.0, 0.44, 0.32)  # волна 2 (закрывает фундамент правого дома)
+		# ЛЕВЫЙ дом + левые краевые ёлки — фундамент за переднюю волну 1
+		var lhouse := _make_house(2.4)
+		layer.add_child(lhouse)
+		atmo_props.append({"node": lhouse, "nx": 0.30, "base_y": 1018.0, "factor": 0.60})
+		_add_chimney_smoke(lhouse)
+		_add_fir(layer, 0.05, 1030.0, 2.6, 0.60)
+		_add_fir(layer, 0.14, 1018.0, 2.1, 0.60)
+		_add_fir(layer, 0.22, 1028.0, 1.8, 0.60)
+		_add_dune(layer, 28.0, 10, 42, 1040.0, 0.60, 0.46) # волна 1 (передняя, тёмная — контраст/глубина)
 
-	# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
-	_add_fir(layer, -0.05, 1190.0, 4.2, 0.85)
-	_add_fir(layer, 1.05, 1210.0, 4.4, 0.90)
+		# --- ПЕРЕДНИЙ ПЛАН: огромные тёмные ёлки в самых углах (рамка, центр свободен) ---
+		_add_fir(layer, -0.05, 1190.0, 4.2, 0.85)
+		_add_fir(layer, 1.05, 1210.0, 4.4, 0.90)
 
 	# Лёгкие частицы-пылинки, медленно плывут вверх.
 	motes = CPUParticles2D.new()
