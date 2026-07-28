@@ -14,6 +14,7 @@ const MISS_LIMIT := 230.0       # летящий камень провалилс
 const COLLAPSE_DROP := 150.0    # уложенный камень просел => башня рушится
 const COLLAPSE_ANGLE := 0.85    # уложенный камень накренился (~49°) => рушится
 const BUILD_TAG := "frozen-10"   # ВРЕМЕННО: метка сборки + HUD позиций
+const SHOW_DEBUG_HUD := false
 
 const BASE_W := 720.0
 const BASE_H := 1280.0
@@ -298,10 +299,14 @@ func _setup_background() -> void:
 
 	if ZEN_PIXEL_BG:
 		# Цельный пиксель-арт задник (сакура-горы + лес + пагода + земля) — параллакс-слой.
-		var scn := _tex("res://assets/zen/scene_px.png")
+		var scn := _first_skin_tex(["background_gpt_v1.png", "background.png", "scene_px.png"])
 		if scn:
 			var ssc := BASE_W / float(scn.get_width()) * 1.12
-			_add_bg_layer(scn, -90, 0.45, 1080.0, "center", ssc, false)
+			_add_bg_layer(scn, -90, 0.45, 1460.0, "center", ssc, false)
+		var fg := _skin_tex("foreground.png")
+		if fg:
+			var fsc := BASE_W / float(fg.get_width()) * 1.12
+			_add_bg_layer(fg, -82, 0.30, 1460.0, "center", fsc, false)
 	else:
 		# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
 		# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
@@ -905,19 +910,20 @@ func _setup_ui() -> void:
 	msg_label.visible = false
 	layer.add_child(msg_label)
 
-	# ВРЕМЕННО: HUD позиций (жёлтый текст вверху-слева).
-	dbg_label = Label.new()
-	dbg_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	dbg_label.offset_top = 120
-	dbg_label.offset_left = 12
-	dbg_label.add_theme_font_override("font", bold)
-	dbg_label.add_theme_font_size_override("font_size", 22)
-	dbg_label.add_theme_color_override("font_color", Color("FFD24A"))
-	dbg_label.add_theme_constant_override("outline_size", 6)
-	dbg_label.add_theme_color_override("font_outline_color", Color("000000"))
-	dbg_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	dbg_label.text = "BUILD %s" % BUILD_TAG
-	layer.add_child(dbg_label)
+	if SHOW_DEBUG_HUD:
+		# ВРЕМЕННО: HUD позиций (жёлтый текст вверху-слева).
+		dbg_label = Label.new()
+		dbg_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+		dbg_label.offset_top = 120
+		dbg_label.offset_left = 12
+		dbg_label.add_theme_font_override("font", bold)
+		dbg_label.add_theme_font_size_override("font_size", 22)
+		dbg_label.add_theme_color_override("font_color", Color("FFD24A"))
+		dbg_label.add_theme_constant_override("outline_size", 6)
+		dbg_label.add_theme_color_override("font_outline_color", Color("000000"))
+		dbg_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dbg_label.text = "BUILD %s" % BUILD_TAG
+		layer.add_child(dbg_label)
 
 	# Кнопка смены скина (верх-право), стилизованная «пилюля» под тему скина.
 	skin_button = Button.new()
@@ -1151,6 +1157,8 @@ func _setup_pedestal() -> void:
 	shape.shape = rect
 	ped.add_child(shape)
 	var ped_tex: Texture2D = theme.get("pedestal")
+	if not ped_tex and skin == 0:
+		ped_tex = _skin_tex("pedestal.png")
 	var stones_arr: Array = theme.get("stones", [])
 	if ped_tex:
 		ped.add_child(_sprite_scaled_to_width(ped_tex, ssize.x))
@@ -1623,9 +1631,14 @@ func _animate_release(c: Node2D) -> void:
 
 # ---------- Рисование (заглушки векторной графикой) ----------
 
-# --- Тема/скин: подхватывает картинки из res://assets/zen/, если они есть ---
+# --- Тема/скин: подхватывает картинки скина, если они есть ---
 
 const THEME_DIR := "res://assets/zen/"
+const SKIN_DIRS := [
+	"res://assets/skins/zen/",
+	"res://assets/skins/diner/",
+	"res://assets/skins/airport/",
+]
 
 # false — вернуться к самому первому виду «тёплый рассвет» (всё рисуется кодом:
 # градиентное небо, солнце, холмы, камни-булыжники, рука). true — подхватить
@@ -1638,18 +1651,18 @@ func _load_theme() -> void:
 		return
 	theme = {
 		"stones": [],
-		"hand": _tex(THEME_DIR + "hand.svg"),
+		"hand": _first_skin_tex(["hand.png", "hand.svg"]),
 		"hand_release": null,
-		"background": _tex(THEME_DIR + "background.svg"),
-		"scene": _tex(THEME_DIR + "scene.svg"),
-		"far": _tex(THEME_DIR + "far.svg"),
-		"mid": _tex(THEME_DIR + "mid.svg"),
-		"near_left": _tex(THEME_DIR + "near_left.svg"),
-		"near_right": _tex(THEME_DIR + "near_right.svg"),
-		"pedestal": _tex(THEME_DIR + "pedestal.svg"),
+		"background": _first_skin_tex(["background_gpt_v1.png", "background.png", "background.svg"]),
+		"scene": _first_skin_tex(["background_gpt_v1.png", "background.png", "scene.svg"]),
+		"far": _skin_tex("far.svg"),
+		"mid": _skin_tex("mid.svg"),
+		"near_left": _skin_tex("near_left.svg"),
+		"near_right": _skin_tex("near_right.svg"),
+		"pedestal": _skin_tex("pedestal.svg"),
 	}
-	for n in ["stone.svg", "stone2.svg", "stone3.svg", "stone4.svg"]:
-		var t := _tex(THEME_DIR + n)
+	for n in ["stone.png", "stone2.png", "stone3.png", "stone4.png", "stone.svg", "stone2.svg", "stone3.svg", "stone4.svg"]:
+		var t := _skin_tex(n)
 		if t:
 			theme["stones"].append(t)
 	# Подгоняем физическую коробку камня под пропорции арта (ширина 180).
@@ -1660,8 +1673,43 @@ func _load_theme() -> void:
 
 func _tex(path: String) -> Texture2D:
 	if ResourceLoader.exists(path):
-		return load(path)
+		var res := load(path)
+		if res is Texture2D:
+			return res
 	return null
+
+func _first_tex(paths: Array) -> Texture2D:
+	for path in paths:
+		var tex := _tex(path)
+		if tex:
+			return tex
+	return null
+
+func _skin_dir() -> String:
+	return SKIN_DIRS[clampi(skin, 0, SKIN_DIRS.size() - 1)]
+
+func _skin_tex(name: String) -> Texture2D:
+	var tex := _tex(_skin_dir() + name)
+	if tex:
+		return tex
+	if skin == 0:
+		return _tex(THEME_DIR + name)
+	return null
+
+func _first_skin_tex(names: Array) -> Texture2D:
+	for name in names:
+		var tex := _skin_tex(name)
+		if tex:
+			return tex
+	return null
+
+func _skin_variant_tex(prefix: String, idx: int) -> Texture2D:
+	var n := ((idx if idx >= 0 else 0) % 4) + 1
+	return _first_skin_tex([
+		"%s%d.png" % [prefix, n],
+		"%s_%d.png" % [prefix, n],
+		"%s.png" % prefix,
+	])
 
 func _top_color(tex: Texture2D) -> Color:
 	var img := tex.get_image()
@@ -1683,6 +1731,9 @@ func _stone_visual(size: Vector2, base: Color, idx: int) -> Node2D:
 
 # Блинчик 3 видов: 0 классический+клён, 1 шоколадный+сгущёнка (слева), 2 ягодный+джем.
 func _make_pancake(size: Vector2, idx: int) -> Node2D:
+	var tex := _skin_variant_tex("pancake", idx)
+	if tex:
+		return _sprite_node_scaled_to_box(tex, size)
 	var n := Node2D.new()
 	var hw := size.x / 2.0
 	var hh := size.y / 2.0
@@ -2397,6 +2448,9 @@ func _diner_fan() -> Node2D:
 # Чемодан 3 видов (узнаваемые цвета): 0 красный, 1 бирюзовый, 2 горчичный.
 # Размер тот же, что у камня/блина (ssize ~180x56) — твёрдый горизонтальный кейс.
 func _make_suitcase(size: Vector2, idx: int) -> Node2D:
+	var tex := _skin_variant_tex("suitcase", idx)
+	if tex:
+		return _sprite_node_scaled_to_box(tex, size)
 	var n := Node2D.new()
 	var hw := size.x / 2.0
 	var hh := size.y / 2.0
@@ -3133,6 +3187,24 @@ func _sprite_scaled_to_width(tex: Texture2D, target_w: float) -> Sprite2D:
 	sp.scale = Vector2(s, s)
 	return sp
 
+func _sprite_scaled_to_height(tex: Texture2D, target_h: float) -> Sprite2D:
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var s := target_h / float(maxi(1, tex.get_height()))
+	sp.scale = Vector2(s, s)
+	return sp
+
+func _sprite_node_scaled_to_box(tex: Texture2D, size: Vector2) -> Node2D:
+	var n := Node2D.new()
+	var sp := Sprite2D.new()
+	sp.texture = tex
+	sp.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sp.scale = Vector2(size.x / float(maxi(1, tex.get_width())),
+			size.y / float(maxi(1, tex.get_height())))
+	n.add_child(sp)
+	return n
+
 func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 	var poly := _rock_polygon(size)
 	var p := Polygon2D.new()
@@ -3150,9 +3222,17 @@ func _make_rock(size: Vector2, base: Color) -> Polygon2D:
 func _zen_stone_texs_get() -> Array:
 	if not _zen_stone_texs_loaded:
 		_zen_stone_texs_loaded = true
-		for p in ["res://assets/zen/stone_px.png", "res://assets/zen/stone_px2.png", "res://assets/zen/stone_px3.png"]:
-			if ResourceLoader.exists(p):
-				_zen_stone_texs.append(load(p))
+		for p in [
+				"stone.png",
+				"stone2.png",
+				"stone3.png",
+				"stone4.png",
+				"stone_px.png",
+				"stone_px2.png",
+				"stone_px3.png"]:
+			var tex := _skin_tex(p)
+			if tex:
+				_zen_stone_texs.append(tex)
 	return _zen_stone_texs
 
 func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
@@ -3213,10 +3293,13 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 
 func _add_hand_top(parent: Node, size: Vector2) -> void:
 	var hand_tex: Texture2D = theme.get("hand")
+	if skin == 0 and not hand_tex:
+		hand_tex = _first_skin_tex(["hand.png", "hand.svg"])
 	if hand_tex:
-		var sp := _sprite_scaled_to_width(hand_tex, size.x * 1.1)
-		# В hand.svg кончики пальцев ~ y=185 при центре viewBox 105 → +80 от центра.
-		sp.position = Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 40.0)
+		var sp := _sprite_scaled_to_height(hand_tex, size.y * 3.6) if skin == 0 else _sprite_scaled_to_width(hand_tex, size.x * 1.1)
+		# У Zen-носителя высокий спрайт-щипцы; остальные старые руки выравниваются по ширине.
+		sp.position = Vector2(0.0, -size.y * 1.35) if skin == 0 else Vector2(0.0, -size.y / 2.0 - 80.0 * sp.scale.y + 40.0)
+		sp.z_index = 2
 		parent.add_child(sp)
 		parent.set_meta("hand_node", sp)
 		# Лёгкое «дыхание» руки, пока держит камень.

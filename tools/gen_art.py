@@ -2,14 +2,16 @@
 # Генератор пиксель-арта (16-бит стиль) для скина "Zen": камни, рука, фон.
 # Рисуем на маленькой сетке, потом увеличиваем NEAREST — получаются чёткие пиксели.
 import math
+from pathlib import Path
 from PIL import Image, ImageDraw
 
-OUT = "/Users/marcopolo/Downloads/balance-tower/assets/zen/"
+OUT = Path(__file__).resolve().parents[1] / "assets" / "zen"
 
 
 def save_scaled(img, scale, name):
     w, h = img.size
-    img.resize((w * scale, h * scale), Image.NEAREST).save(OUT + name)
+    OUT.mkdir(parents=True, exist_ok=True)
+    img.resize((w * scale, h * scale), Image.NEAREST).save(OUT / name)
 
 
 def lerp(a, b, t):

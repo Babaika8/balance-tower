@@ -15,7 +15,7 @@ touch build/web/.nojekyll
 echo "    билд готов ($(du -sh build/web | cut -f1))"
 
 echo ">>> [2/2] публикация в gh-pages..."
-ORIGIN="$(git remote get-url origin)"
+ORIGIN="${DEPLOY_ORIGIN:-$(git remote get-url origin)}"
 TMP="$(mktemp -d)"
 cp -a build/web/. "$TMP"/
 cd "$TMP"
