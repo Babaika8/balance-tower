@@ -13,7 +13,7 @@ const DROP_PUSH := 260.0        # начальный толчок камня в�
 const MISS_LIMIT := 230.0       # летящий камень провалился ниже вершины => промах
 const COLLAPSE_DROP := 150.0    # уложенный камень просел => башня рушится
 const COLLAPSE_ANGLE := 0.85    # уложенный камень накренился (~49°) => рушится
-const BUILD_TAG := "frozen-10"   # ВРЕМЕННО: метка сборки + HUD позиций
+const BUILD_TAG := "zen-tall-01"   # ВРЕМЕННО: метка сборки + HUD позиций
 const SHOW_DEBUG_HUD := false
 
 const BASE_W := 720.0
@@ -135,6 +135,7 @@ var atmo_stars: Array = []   # {node, nx, ny}
 var atmo_dunes: Array = []   # {node, base_y, factor, shade}
 var atmo_clouds: Array = []  # {node, nx, speed, ny}
 var atmo_birds: Array = []   # {node, nx, speed, ny}
+var atmo_kites: Array = []   # {node, nx, speed, ny, amp, phase}
 var atmo_props: Array = []   # ёлочки/домики/сакуры: {node, nx, base_y, factor}
 
 func _ready() -> void:
@@ -296,14 +297,25 @@ func _setup_background() -> void:
 		layer.add_child(bird)
 		atmo_birds.append({"node": bird, "nx": randf(), "speed": randf_range(0.022, 0.036),
 				"ny": randf_range(120, 460)})
+	for i in range(4):
+		var kite := _make_zen_kite(i)
+		layer.add_child(kite)
+		atmo_kites.append({"node": kite, "nx": randf(), "speed": randf_range(0.006, 0.014),
+				"ny": randf_range(70.0, 330.0), "amp": randf_range(10.0, 28.0),
+				"phase": randf() * TAU})
 
 	if ZEN_PIXEL_BG:
 		# Цельный пиксель-арт задник (сакура-горы + лес + пагода + земля) — параллакс-слой.
-		var scn := _first_skin_tex(["background_gpt_v1.png", "background.png", "scene_px.png"])
+		var scn := _first_skin_tex(["background_tall.png", "background_gpt_v1.png", "background.png", "scene_px.png"])
+		var tall_bg := scn == _skin_tex("background_tall.png")
 		if scn:
-			var ssc := BASE_W / float(scn.get_width()) * 1.12
-			_add_bg_layer(scn, -90, 0.45, 1460.0, "center", ssc, false)
-		var fg := _skin_tex("foreground.png")
+			var ssc := BASE_W / float(scn.get_width()) * 1.04
+			var bg := _add_bg_layer(scn, -90, 0.08, 1500.0, "center", ssc, false)
+			if tall_bg and not bg_layers.is_empty():
+				var sy := ssc * 3.35
+				bg.scale = Vector2(ssc, sy)
+				bg_layers[bg_layers.size() - 1]["scale_y"] = sy
+		var fg := _skin_tex("foreground.png") if not tall_bg else null
 		if fg:
 			var fsc := BASE_W / float(fg.get_width()) * 1.12
 			_add_bg_layer(fg, -82, 0.30, 1460.0, "center", fsc, false)
@@ -679,6 +691,14 @@ func _update_atmosphere() -> void:
 		bn.position = Vector2(lerp(-120.0, vw + 120.0, bd["nx"]), bd["ny"])
 		bn.modulate.a = lerp(0.7, 0.15, night)
 
+	var t_now: float = Time.get_ticks_msec() / 1000.0
+	for kt in atmo_kites:
+		kt["nx"] = fmod(kt["nx"] + kt["speed"] * dt, 1.0)
+		var kn: Node2D = kt["node"]
+		var wobble: float = sin(t_now * 0.9 + float(kt["phase"])) * float(kt["amp"])
+		kn.position = Vector2(lerp(-180.0, vw + 180.0, kt["nx"]), kt["ny"] + wobble)
+		kn.modulate.a = lerp(0.9, 0.25, night)
+
 	# Дюны/горы: центр по экрану, цвет от фазы (shade>0 темнее земли — ближе;
 	# shade<0 светлее — далёкие горы в дымке), параллакс.
 	for d in atmo_dunes:
@@ -743,8 +763,9 @@ func _update_parallax() -> void:
 	for L in bg_layers:
 		var node: Sprite2D = L["node"]
 		var scale: float = L["scale"]
+		var scale_y: float = L.get("scale_y", scale)
 		var sw: float = L["art_w"] * scale
-		var sh: float = L["art_h"] * scale
+		var sh: float = L["art_h"] * scale_y
 		var world_bottom: float = L["bottom_y"] + (camera.position.y - start_cam_y) * L["drift"]
 		var x: float = base_x
 		match L["mode"]:
@@ -818,6 +839,43 @@ func _make_bird() -> Node2D:
 	var tw := create_tween().set_loops()
 	tw.tween_property(w, "scale", Vector2(1.0, 0.5), 0.4).set_trans(Tween.TRANS_SINE)
 	tw.tween_property(w, "scale", Vector2(1.0, 1.0), 0.4).set_trans(Tween.TRANS_SINE)
+	return n
+
+func _make_zen_kite(kind: int) -> Node2D:
+	var n := Node2D.new()
+	n.scale = Vector2(0.72, 0.72)
+	var colors := [Color("D95050"), Color("3F75D8"), Color("E7A84D"), Color("2F8F74")]
+	if kind % 2 == 0:
+		var body := Polygon2D.new()
+		body.polygon = PackedVector2Array([Vector2(0, -28), Vector2(26, 0), Vector2(0, 30), Vector2(-26, 0)])
+		body.color = colors[kind % colors.size()]
+		n.add_child(body)
+		var rib := Polygon2D.new()
+		rib.polygon = PackedVector2Array([Vector2(-2, -28), Vector2(2, -28), Vector2(2, 30), Vector2(-2, 30)])
+		rib.color = Color(1, 1, 1, 0.55)
+		n.add_child(rib)
+		var tail := Line2D.new()
+		tail.width = 2.0
+		tail.default_color = Color(1, 0.86, 0.72, 0.75)
+		tail.points = PackedVector2Array([Vector2(0, 30), Vector2(-18, 56), Vector2(12, 82), Vector2(-10, 110)])
+		n.add_child(tail)
+	else:
+		var body := Polygon2D.new()
+		body.polygon = PackedVector2Array([Vector2(-58, -18), Vector2(38, -18), Vector2(62, 0), Vector2(38, 18), Vector2(-58, 18)])
+		body.color = colors[kind % colors.size()]
+		n.add_child(body)
+		var eye := Polygon2D.new()
+		eye.polygon = _circle_polygon(5.0, 10)
+		eye.position = Vector2(28, -3)
+		eye.color = Color("F7F0D6")
+		n.add_child(eye)
+		var tail := Polygon2D.new()
+		tail.polygon = PackedVector2Array([Vector2(-58, -18), Vector2(-78, -8), Vector2(-58, 0), Vector2(-78, 8), Vector2(-58, 18)])
+		tail.color = body.color.darkened(0.22)
+		n.add_child(tail)
+	var tw := n.create_tween().set_loops()
+	tw.tween_property(n, "rotation", 0.08, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tw.tween_property(n, "rotation", -0.08, 1.8).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	return n
 
 func _make_balloon() -> Node2D:
@@ -3292,6 +3350,8 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 	return n
 
 func _add_hand_top(parent: Node, size: Vector2) -> void:
+	if skin == 0:
+		return
 	var hand_tex: Texture2D = theme.get("hand")
 	if skin == 0 and not hand_tex:
 		hand_tex = _first_skin_tex(["hand.png", "hand.svg"])
