@@ -3628,6 +3628,14 @@ func _zen_stone_texs_get() -> Array:
 				"stone2.png",
 				"stone3.png",
 				"stone4.png",
+				"stone5.png",
+				"stone6.png",
+				"stone7.png",
+				"stone8.png",
+				"stone9.png",
+				"stone10.png",
+				"stone11.png",
+				"stone12.png",
 				"stone_px.png",
 				"stone_px2.png",
 				"stone_px3.png"]:
@@ -3646,9 +3654,9 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var visual_h: float = [1.34, 1.28, 1.38, 1.32][ti % 4]
+		var visual_h: float = [1.16, 1.12, 1.14, 1.18, 1.12, 1.15, 1.10, 1.12, 1.16, 1.14, 1.18, 1.13][ti % 12]
 		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
-		spr.position.y = float([3.0, 2.0, 4.0, 3.0][ti % 4])
+		spr.position.y = float([2.0, 2.0, 2.0, 3.0, 2.0, 2.0, 1.0, 2.0, 2.0, 2.0, 3.0, 2.0][ti % 12])
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
