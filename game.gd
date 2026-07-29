@@ -144,6 +144,9 @@ var zen_life_clouds: Array = []  # {node, nx, ny, speed, alpha}
 var zen_life_birds: Array = []   # {node, nx, ny, speed}
 var zen_life_kites: Array = []   # {node, nx, ny, speed, amp, phase}
 var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
+var zen_life_fog: Array = []     # {node, nx, ny, speed, alpha}
+var zen_life_water: Array = []   # {node, x, y, phase, alpha}
+var zen_life_glows: Array = []   # {node, x, y, phase, alpha}
 
 func _ready() -> void:
 	randomize()
@@ -298,19 +301,6 @@ func _setup_background() -> void:
 	atmo_glow.texture = _tex(THEME_DIR + "smoke.svg")
 	layer.add_child(atmo_glow)
 
-	# Птицы — лёгкие силуэты, летят по небу (оживляют пустоту, особенно на широком).
-	for i in range(5):
-		var bird := _make_bird()
-		layer.add_child(bird)
-		atmo_birds.append({"node": bird, "nx": randf(), "speed": randf_range(0.022, 0.036),
-				"ny": randf_range(120, 460)})
-	for i in range(4):
-		var kite := _make_zen_kite(i)
-		layer.add_child(kite)
-		atmo_kites.append({"node": kite, "nx": randf(), "speed": randf_range(0.006, 0.014),
-				"ny": randf_range(70.0, 330.0), "amp": randf_range(10.0, 28.0),
-				"phase": randf() * TAU})
-
 	if ZEN_PIXEL_BG:
 		# Цельный пиксель-арт задник (сакура-горы + лес + пагода + земля) — параллакс-слой.
 		var scn := _first_skin_tex(["background_tall.png", "background_gpt_v1.png", "background.png", "scene_px.png"])
@@ -326,6 +316,20 @@ func _setup_background() -> void:
 			var fsc := BASE_W / float(fg.get_width()) * 1.12
 			_add_bg_layer(fg, -82, 0.30, 1460.0, "center", fsc, false)
 	else:
+		# В процедурной сцене эти объекты встроены в графику; на GPT-заднике они
+		# выглядят как наклейки, поэтому там работает отдельный тихий life-layer.
+		for i in range(5):
+			var bird := _make_bird()
+			layer.add_child(bird)
+			atmo_birds.append({"node": bird, "nx": randf(), "speed": randf_range(0.022, 0.036),
+					"ny": randf_range(120, 460)})
+		for i in range(4):
+			var kite := _make_zen_kite(i)
+			layer.add_child(kite)
+			atmo_kites.append({"node": kite, "nx": randf(), "speed": randf_range(0.006, 0.014),
+					"ny": randf_range(70.0, 330.0), "amp": randf_range(10.0, 28.0),
+					"phase": randf() * TAU})
+
 		# Слои добавляются строго от дальнего к ближнему (порядок = z). Дома и ёлки
 		# вставлены МЕЖДУ волнами земли, чтобы передняя волна перекрывала их низ.
 		# nx у ёлок — только края (центр свободен под камни).
@@ -761,24 +765,27 @@ func _setup_zen_life_overlay() -> void:
 	zen_life_petals.color = Color(1, 1, 1, 0.82)
 	zen_life_layer.add_child(zen_life_petals)
 
-	for i in range(7):
-		var cl := _make_cloud()
-		cl.scale = Vector2(randf_range(0.9, 1.8), randf_range(0.8, 1.35))
-		zen_life_layer.add_child(cl)
-		zen_life_clouds.append({"node": cl, "nx": randf(), "ny": randf_range(70.0, 430.0),
-				"speed": randf_range(0.004, 0.011), "alpha": randf_range(0.12, 0.28)})
-	for i in range(5):
-		var bird := _make_bird()
-		bird.scale = Vector2(0.75, 0.75)
-		zen_life_layer.add_child(bird)
-		zen_life_birds.append({"node": bird, "nx": randf(), "ny": randf_range(95.0, 390.0),
-				"speed": randf_range(0.018, 0.034)})
 	for i in range(4):
-		var kite := _make_zen_kite(i)
-		zen_life_layer.add_child(kite)
-		zen_life_kites.append({"node": kite, "nx": randf(), "ny": randf_range(80.0, 500.0),
-				"speed": randf_range(0.006, 0.015), "amp": randf_range(10.0, 32.0),
-				"phase": randf() * TAU})
+		var fog := _make_fog_band()
+		zen_life_layer.add_child(fog)
+		zen_life_fog.append({"node": fog, "nx": randf(), "ny": [210.0, 390.0, 570.0, 760.0][i],
+				"speed": randf_range(0.004, 0.010), "alpha": randf_range(0.035, 0.075)})
+	for pos in [[64.0, 760.0], [92.0, 850.0], [112.0, 940.0], [610.0, 710.0], [648.0, 825.0], [660.0, 928.0], [92.0, 1060.0], [618.0, 1080.0]]:
+		var glint := _make_water_glint()
+		zen_life_layer.add_child(glint)
+		zen_life_water.append({"node": glint, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
+				"alpha": randf_range(0.16, 0.34)})
+	for pos in [[70.0, 1050.0], [650.0, 1055.0], [160.0, 715.0], [560.0, 690.0]]:
+		var glow := _make_lantern_glow()
+		zen_life_layer.add_child(glow)
+		zen_life_glows.append({"node": glow, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
+				"alpha": randf_range(0.04, 0.10)})
+	for i in range(3):
+		var cl := _make_cloud()
+		cl.scale = Vector2(randf_range(0.7, 1.2), randf_range(0.6, 1.0))
+		zen_life_layer.add_child(cl)
+		zen_life_clouds.append({"node": cl, "nx": randf(), "ny": randf_range(80.0, 260.0),
+				"speed": randf_range(0.003, 0.007), "alpha": randf_range(0.06, 0.12)})
 	for i in range(34):
 		var petal := Polygon2D.new()
 		petal.polygon = PackedVector2Array([Vector2(0, -3), Vector2(5, 0), Vector2(0, 3), Vector2(-5, 0)])
@@ -808,7 +815,7 @@ func _update_zen_life() -> void:
 
 	zen_life_petals.position = Vector2(vw * 0.5, -24.0)
 	zen_life_petals.emission_rect_extents = Vector2(vw * 0.54, 8.0)
-	zen_life_petals.amount = int(lerp(18.0, 58.0, lower_phase))
+	zen_life_petals.amount = int(lerp(14.0, 46.0, lower_phase))
 	zen_life_petals.self_modulate.a = lerp(0.25, 0.95, lower_phase)
 
 	for c in zen_life_clouds:
@@ -835,6 +842,20 @@ func _update_zen_life() -> void:
 		pn.position = Vector2(fposmod(x, vw + 80.0) - 40.0, y)
 		pn.rotation = t * 1.8 + float(p["phase"])
 		pn.modulate.a = lerp(0.08, 0.72, lower_phase)
+	for fband in zen_life_fog:
+		fband["nx"] = fmod(float(fband["nx"]) + float(fband["speed"]) * dt, 1.0)
+		var fn: Line2D = fband["node"]
+		fn.position = Vector2(lerp(-180.0, 180.0, float(fband["nx"])), float(fband["ny"]))
+		fn.modulate.a = float(fband["alpha"]) * lerp(1.0, 0.45, sky_phase)
+	for w in zen_life_water:
+		var wn: Line2D = w["node"]
+		wn.position = Vector2(float(w["x"]), float(w["y"]))
+		wn.modulate.a = float(w["alpha"]) * (0.45 + 0.55 * (0.5 + 0.5 * sin(t * 2.4 + float(w["phase"]))))
+	for g in zen_life_glows:
+		var gn: Polygon2D = g["node"]
+		gn.position = Vector2(float(g["x"]), float(g["y"]))
+		gn.scale = Vector2.ONE * (0.88 + 0.12 * sin(t * 1.6 + float(g["phase"])))
+		gn.modulate.a = float(g["alpha"]) * (0.55 + 0.45 * (0.5 + 0.5 * sin(t * 1.2 + float(g["phase"]))))
 
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
@@ -934,6 +955,33 @@ func _make_cloud() -> Node2D:
 		e.position = Vector2(p[0], p[1])
 		n.add_child(e)
 	return n
+
+func _make_fog_band() -> Line2D:
+	var l := Line2D.new()
+	l.width = randf_range(7.0, 14.0)
+	l.default_color = Color(0.86, 0.92, 1.0, 1.0)
+	l.points = PackedVector2Array([
+		Vector2(-120, 0), Vector2(80, -6), Vector2(280, 3), Vector2(500, -5), Vector2(780, 2)
+	])
+	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	l.end_cap_mode = Line2D.LINE_CAP_ROUND
+	return l
+
+func _make_water_glint() -> Line2D:
+	var l := Line2D.new()
+	l.width = randf_range(1.5, 3.0)
+	l.default_color = Color(0.68, 0.92, 1.0, 1.0)
+	var w := randf_range(24.0, 58.0)
+	l.points = PackedVector2Array([Vector2(-w * 0.5, 0), Vector2(w * 0.5, randf_range(-2.0, 2.0))])
+	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	l.end_cap_mode = Line2D.LINE_CAP_ROUND
+	return l
+
+func _make_lantern_glow() -> Polygon2D:
+	var p := Polygon2D.new()
+	p.polygon = _circle_polygon(randf_range(16.0, 26.0), 18)
+	p.color = Color("FFD37A")
+	return p
 
 func _make_bird() -> Node2D:
 	# Простой силуэт «галочкой» с лёгким взмахом крыльев.
@@ -1361,16 +1409,16 @@ func _setup_dust() -> void:
 	dust.emitting = false
 	dust.one_shot = true
 	dust.explosiveness = 1.0
-	dust.amount = 24
-	dust.lifetime = 0.8
+	dust.amount = 14
+	dust.lifetime = 0.45
 	dust.direction = Vector2(0, -1)
-	dust.spread = 80.0
-	dust.initial_velocity_min = 60.0
-	dust.initial_velocity_max = 190.0
-	dust.gravity = Vector2(0, 340)
-	dust.scale_amount_min = 3.0
-	dust.scale_amount_max = 7.0
-	dust.color = Color(0.86, 0.72, 0.55, 0.9)
+	dust.spread = 62.0
+	dust.initial_velocity_min = 22.0
+	dust.initial_velocity_max = 88.0
+	dust.gravity = Vector2(0, 170)
+	dust.scale_amount_min = 1.0
+	dust.scale_amount_max = 2.6
+	dust.color = Color(0.78, 0.70, 0.62, 0.46)
 	add_child(dust)
 
 # ---------- Игровой цикл ----------
@@ -1741,9 +1789,76 @@ func _update_score() -> void:
 	score_label.text = "Высота: %d" % score
 
 func _puff(at: Vector2) -> void:
+	if skin == 0:
+		_zen_contact_fx(at)
+		return
 	dust.global_position = at
 	dust.restart()
 	dust.emitting = true
+
+func _zen_contact_fx(at: Vector2) -> void:
+	var kind := randi() % 4
+	if kind == 0:
+		dust.amount = 7
+		dust.lifetime = 0.24
+		dust.initial_velocity_min = 10.0
+		dust.initial_velocity_max = 38.0
+		dust.scale_amount_min = 0.55
+		dust.scale_amount_max = 1.25
+		dust.color = Color(0.72, 0.66, 0.58, 0.26)
+		dust.global_position = at
+		dust.restart()
+		dust.emitting = true
+	elif kind == 1:
+		for i in range(4):
+			var petal := Polygon2D.new()
+			petal.polygon = PackedVector2Array([Vector2(0, -3), Vector2(5, 0), Vector2(0, 3), Vector2(-5, 0)])
+			petal.color = [Color("F3B4D3"), Color("FFD3E5"), Color("ECA0C8")][i % 3]
+			petal.position = at + Vector2(randf_range(-28.0, 28.0), randf_range(-4.0, 4.0))
+			petal.z_index = 42
+			add_child(petal)
+			var tw := petal.create_tween()
+			tw.set_parallel(true)
+			tw.tween_property(petal, "position", petal.position + Vector2(randf_range(-20.0, 20.0), randf_range(-24.0, -10.0)), 0.30).set_trans(Tween.TRANS_SINE)
+			tw.tween_property(petal, "rotation", randf_range(-1.2, 1.2), 0.30)
+			tw.tween_property(petal, "modulate:a", 0.0, 0.30).set_delay(0.04)
+			tw.set_parallel(false)
+			tw.tween_callback(petal.queue_free)
+	elif kind == 2:
+		var ring := Line2D.new()
+		ring.width = 2.0
+		ring.default_color = Color(1.0, 0.88, 0.56, 0.36)
+		var pts := PackedVector2Array()
+		for i in range(24):
+			var a := TAU * i / 24.0
+			pts.append(Vector2(cos(a) * 34.0, sin(a) * 5.0))
+		pts.append(pts[0])
+		ring.points = pts
+		ring.position = at
+		ring.z_index = 42
+		add_child(ring)
+		var tw := ring.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(ring, "scale", Vector2(1.25, 1.25), 0.22).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(ring, "modulate:a", 0.0, 0.22)
+		tw.set_parallel(false)
+		tw.tween_callback(ring.queue_free)
+	else:
+		for i in range(3):
+			var tick := Line2D.new()
+			tick.width = 3.0
+			tick.default_color = [Color(0.97, 0.84, 0.48, 0.42), Color(0.86, 0.90, 1.0, 0.32), Color(1.0, 0.72, 0.82, 0.34)][i]
+			var side := -1.0 if i == 0 else (1.0 if i == 1 else randf_range(-0.35, 0.35))
+			tick.points = PackedVector2Array([Vector2.ZERO, Vector2(side * randf_range(12.0, 24.0), randf_range(-18.0, -8.0))])
+			tick.position = at + Vector2(randf_range(-28.0, 28.0), randf_range(-2.0, 4.0))
+			tick.z_index = 42
+			add_child(tick)
+			var tw := tick.create_tween()
+			tw.set_parallel(true)
+			tw.tween_property(tick, "modulate:a", 0.0, 0.20)
+			tw.tween_property(tick, "position:y", tick.position.y - 8.0, 0.20)
+			tw.set_parallel(false)
+			tw.tween_callback(tick.queue_free)
 
 # Сочный фидбэк за точную укладку: всплывающая надпись «Perfect! +5».
 func _perfect_fx(stone: RigidBody2D) -> void:
@@ -3410,9 +3525,9 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var visual_h: float = [1.52, 1.46, 1.58][ti % 3]
+		var visual_h: float = [2.42, 2.32, 2.50][ti % 3]
 		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
-		spr.position.y = float([2.0, 0.0, 3.0][ti % 3])
+		spr.position.y = float([8.0, 6.0, 9.0][ti % 3])
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
