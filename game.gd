@@ -147,6 +147,9 @@ var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
 var zen_life_fog: Array = []     # {node, nx, ny, speed, alpha}
 var zen_life_water: Array = []   # {node, x, y, phase, alpha}
 var zen_life_glows: Array = []   # {node, x, y, phase, alpha}
+var zen_life_bamboo: Array = []  # {node, x, y, phase, amp}
+var zen_life_lanterns: Array = [] # {node, x, y, phase}
+var zen_life_monks: Array = []   # {node, staff, x, y, phase}
 
 func _ready() -> void:
 	randomize()
@@ -780,6 +783,20 @@ func _setup_zen_life_overlay() -> void:
 		zen_life_layer.add_child(glow)
 		zen_life_glows.append({"node": glow, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
 				"alpha": randf_range(0.04, 0.10)})
+	for pos in [[28.0, 550.0, -1.0], [62.0, 700.0, -1.0], [684.0, 570.0, 1.0], [652.0, 740.0, 1.0]]:
+		var bamboo := _make_bamboo_sway(float(pos[2]))
+		zen_life_layer.add_child(bamboo)
+		zen_life_bamboo.append({"node": bamboo, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
+				"amp": randf_range(0.016, 0.030)})
+	for pos in [[78.0, 765.0], [648.0, 985.0], [564.0, 666.0]]:
+		var lantern := _make_hanging_lantern()
+		zen_life_layer.add_child(lantern)
+		zen_life_lanterns.append({"node": lantern, "x": pos[0], "y": pos[1], "phase": randf() * TAU})
+	for pos in [[552.0, 548.0], [585.0, 548.0]]:
+		var monk_data := _make_training_monk()
+		var monk_node: Node2D = monk_data["node"]
+		zen_life_layer.add_child(monk_node)
+		zen_life_monks.append({"node": monk_node, "staff": monk_data["staff"], "x": pos[0], "y": pos[1], "phase": randf() * TAU})
 	for i in range(3):
 		var cl := _make_cloud()
 		cl.scale = Vector2(randf_range(0.7, 1.2), randf_range(0.6, 1.0))
@@ -856,6 +873,22 @@ func _update_zen_life() -> void:
 		gn.position = Vector2(float(g["x"]), float(g["y"]))
 		gn.scale = Vector2.ONE * (0.88 + 0.12 * sin(t * 1.6 + float(g["phase"])))
 		gn.modulate.a = float(g["alpha"]) * (0.55 + 0.45 * (0.5 + 0.5 * sin(t * 1.2 + float(g["phase"]))))
+	for bmb in zen_life_bamboo:
+		var bn: Node2D = bmb["node"]
+		bn.position = Vector2(float(bmb["x"]), float(bmb["y"]))
+		bn.rotation = sin(t * 0.9 + float(bmb["phase"])) * float(bmb["amp"])
+		bn.modulate.a = lerp(0.50, 0.92, lower_phase)
+	for ldata in zen_life_lanterns:
+		var ln: Node2D = ldata["node"]
+		ln.position = Vector2(float(ldata["x"]), float(ldata["y"]))
+		ln.rotation = sin(t * 1.15 + float(ldata["phase"])) * 0.045
+		ln.modulate.a = 0.42 + 0.16 * sin(t * 2.1 + float(ldata["phase"]))
+	for monk in zen_life_monks:
+		var mn: Node2D = monk["node"]
+		var staff: Node2D = monk["staff"]
+		mn.position = Vector2(float(monk["x"]), float(monk["y"]))
+		mn.modulate.a = lerp(0.15, 0.50, lower_phase)
+		staff.rotation = sin(t * 2.4 + float(monk["phase"])) * 0.75
 
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
@@ -982,6 +1015,73 @@ func _make_lantern_glow() -> Polygon2D:
 	p.polygon = _circle_polygon(randf_range(16.0, 26.0), 18)
 	p.color = Color("FFD37A")
 	return p
+
+func _make_bamboo_sway(side: float) -> Node2D:
+	var n := Node2D.new()
+	n.z_index = -68
+	for i in range(3):
+		var stem := Line2D.new()
+		stem.width = 5.0 - i
+		stem.default_color = [Color("356C51"), Color("4A8964"), Color("27573E")][i]
+		var x := side * float(i * 11)
+		stem.points = PackedVector2Array([Vector2(x, 160), Vector2(x + side * 6.0, 78), Vector2(x + side * 10.0, -30)])
+		n.add_child(stem)
+		for j in range(4):
+			var leaf := Polygon2D.new()
+			var y := 18.0 + j * 34.0 - i * 8.0
+			leaf.polygon = PackedVector2Array([
+				Vector2(x, y),
+				Vector2(x + side * randf_range(22.0, 42.0), y - randf_range(8.0, 16.0)),
+				Vector2(x + side * randf_range(8.0, 18.0), y + randf_range(4.0, 10.0))
+			])
+			leaf.color = [Color("5CA875"), Color("7CC58B"), Color("3E7C58")][(i + j) % 3]
+			n.add_child(leaf)
+	return n
+
+func _make_hanging_lantern() -> Node2D:
+	var n := Node2D.new()
+	n.z_index = -67
+	var cord := Line2D.new()
+	cord.width = 2.0
+	cord.default_color = Color(0.14, 0.11, 0.10, 0.65)
+	cord.points = PackedVector2Array([Vector2(0, -22), Vector2(0, -2)])
+	n.add_child(cord)
+	var glow := Polygon2D.new()
+	glow.polygon = _circle_polygon(18.0, 14)
+	glow.color = Color(1.0, 0.65, 0.25, 0.16)
+	glow.position = Vector2(0, 8)
+	n.add_child(glow)
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-8, -3), Vector2(8, -3), Vector2(10, 11), Vector2(4, 20), Vector2(-4, 20), Vector2(-10, 11)])
+	body.color = Color("E49338")
+	n.add_child(body)
+	var cap := Line2D.new()
+	cap.width = 3.0
+	cap.default_color = Color("4E3022")
+	cap.points = PackedVector2Array([Vector2(-10, -4), Vector2(10, -4), Vector2(8, 18), Vector2(-8, 18)])
+	n.add_child(cap)
+	return n
+
+func _make_training_monk() -> Dictionary:
+	var n := Node2D.new()
+	n.z_index = -66
+	n.scale = Vector2(0.52, 0.52)
+	var body := Polygon2D.new()
+	body.polygon = PackedVector2Array([Vector2(-8, -22), Vector2(8, -22), Vector2(11, 8), Vector2(-11, 8)])
+	body.color = Color("3A2830")
+	n.add_child(body)
+	var head := Polygon2D.new()
+	head.polygon = _circle_polygon(6.0, 10)
+	head.color = Color("D2AA82")
+	head.position = Vector2(0, -30)
+	n.add_child(head)
+	var staff := Line2D.new()
+	staff.width = 3.0
+	staff.default_color = Color("B98D54")
+	staff.points = PackedVector2Array([Vector2(-24, -18), Vector2(24, 12)])
+	staff.position = Vector2(0, -8)
+	n.add_child(staff)
+	return {"node": n, "staff": staff}
 
 func _make_bird() -> Node2D:
 	# Простой силуэт «галочкой» с лёгким взмахом крыльев.
@@ -1862,22 +1962,43 @@ func _zen_contact_fx(at: Vector2) -> void:
 
 # Сочный фидбэк за точную укладку: всплывающая надпись «Perfect! +5».
 func _perfect_fx(stone: RigidBody2D) -> void:
-	var l := Label.new()
-	l.text = "Perfect! +5"
-	l.add_theme_font_override("font", _bold())
-	l.add_theme_font_size_override("font_size", 42)
-	l.add_theme_color_override("font_color", Color("FFE9A8"))
-	l.add_theme_constant_override("outline_size", 8)
-	l.add_theme_color_override("font_outline_color", Color("3A2A12"))
-	l.z_index = 60
-	l.position = stone.global_position + Vector2(-104, -56)
-	add_child(l)
-	var tw := l.create_tween()
-	tw.set_parallel(true)
-	tw.tween_property(l, "position:y", l.position.y - 80.0, 0.8).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
-	tw.tween_property(l, "modulate:a", 0.0, 0.8).set_delay(0.2)
-	tw.set_parallel(false)
-	tw.tween_callback(l.queue_free)
+	for i in range(3):
+		var l := Label.new()
+		l.text = "Perfect!"
+		l.add_theme_font_override("font", _bold())
+		l.add_theme_font_size_override("font_size", 30 - i * 2)
+		l.add_theme_color_override("font_color", [Color("FFF0A8"), Color("FFD7E8"), Color("BFEFFF")][i])
+		l.add_theme_constant_override("outline_size", 6)
+		l.add_theme_color_override("font_outline_color", Color("3A2534"))
+		l.z_index = 62
+		var offsets: Array[Vector2] = [Vector2(-112, -74), Vector2(18, -104), Vector2(-54, -34)]
+		var offset: Vector2 = offsets[i]
+		l.position = stone.global_position + offset
+		l.scale = Vector2(0.55, 0.55)
+		add_child(l)
+		var tw := l.create_tween()
+		tw.set_parallel(true)
+		tw.tween_property(l, "scale", Vector2(1.0, 1.0), 0.18).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tw.tween_property(l, "position:y", l.position.y - 46.0, 0.64).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_property(l, "modulate:a", 0.0, 0.64).set_delay(0.22)
+		tw.set_parallel(false)
+		tw.tween_callback(l.queue_free)
+	for i in range(7):
+		var star := Line2D.new()
+		star.width = 3.0
+		star.default_color = [Color(1.0, 0.86, 0.30, 0.70), Color(1.0, 0.58, 0.78, 0.52), Color(0.72, 0.92, 1.0, 0.48)][i % 3]
+		var r := randf_range(9.0, 18.0)
+		star.points = PackedVector2Array([Vector2(-r, 0), Vector2(r, 0), Vector2(0, 0), Vector2(0, -r)])
+		star.position = stone.global_position + Vector2(randf_range(-70.0, 70.0), randf_range(-44.0, -10.0))
+		star.rotation = randf() * TAU
+		star.z_index = 61
+		add_child(star)
+		var stw := star.create_tween()
+		stw.set_parallel(true)
+		stw.tween_property(star, "scale", Vector2(1.4, 1.4), 0.26).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		stw.tween_property(star, "modulate:a", 0.0, 0.26)
+		stw.set_parallel(false)
+		stw.tween_callback(star.queue_free)
 
 # Честная проверка Perfect — когда блок уже улёгся: сравниваем с блоком ПОД ним.
 func _check_perfect(stone: RigidBody2D, below: RigidBody2D) -> void:
@@ -3525,9 +3646,9 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var visual_h: float = [2.42, 2.32, 2.50][ti % 3]
+		var visual_h: float = [1.12, 1.08, 1.16][ti % 3]
 		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
-		spr.position.y = float([8.0, 6.0, 9.0][ti % 3])
+		spr.position.y = float([2.0, 1.0, 3.0][ti % 3])
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
