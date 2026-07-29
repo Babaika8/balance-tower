@@ -309,12 +309,9 @@ func _setup_background() -> void:
 		var scn := _first_skin_tex(["background_tall.png", "background_gpt_v1.png", "background.png", "scene_px.png"])
 		var tall_bg := scn == _skin_tex("background_tall.png")
 		if scn:
-			var ssc := BASE_W / float(scn.get_width()) * 1.04
-			var bg := _add_bg_layer(scn, -90, 0.08, 1500.0, "center", ssc, false)
-			if tall_bg and not bg_layers.is_empty():
-				var sy := ssc * 3.35
-				bg.scale = Vector2(ssc, sy)
-				bg_layers[bg_layers.size() - 1]["scale_y"] = sy
+			var ssc := BASE_W / float(scn.get_width()) * (1.0 if tall_bg else 1.04)
+			var drift := 0.45 if tall_bg else 0.08
+			_add_bg_layer(scn, -90, drift, 1500.0, "center", ssc, false)
 		var fg := _skin_tex("foreground.png") if not tall_bg else null
 		if fg:
 			var fsc := BASE_W / float(fg.get_width()) * 1.12
@@ -3302,7 +3299,8 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var nt := Node2D.new()
 		var spr := Sprite2D.new()
 		spr.texture = tex
-		spr.scale = Vector2(size.x / float(tex.get_width()), size.y / float(tex.get_height()))
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * 1.34 / float(tex.get_height()))
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
