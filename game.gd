@@ -137,6 +137,13 @@ var atmo_clouds: Array = []  # {node, nx, speed, ny}
 var atmo_birds: Array = []   # {node, nx, speed, ny}
 var atmo_kites: Array = []   # {node, nx, speed, ny, amp, phase}
 var atmo_props: Array = []   # ёлочки/домики/сакуры: {node, nx, base_y, factor}
+var zen_life_active := false
+var zen_life_layer: Node2D
+var zen_life_petals: CPUParticles2D
+var zen_life_clouds: Array = []  # {node, nx, ny, speed, alpha}
+var zen_life_birds: Array = []   # {node, nx, ny, speed}
+var zen_life_kites: Array = []   # {node, nx, ny, speed, amp, phase}
+var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
 
 func _ready() -> void:
 	randomize()
@@ -310,8 +317,10 @@ func _setup_background() -> void:
 		var tall_bg := scn == _skin_tex("background_tall.png")
 		if scn:
 			var ssc := BASE_W / float(scn.get_width()) * (1.0 if tall_bg else 1.04)
-			var drift := 0.45 if tall_bg else 0.08
+			var drift := 0.62 if tall_bg else 0.08
 			_add_bg_layer(scn, -90, drift, 1500.0, "center", ssc, false)
+			if tall_bg:
+				_setup_zen_life_overlay()
 		var fg := _skin_tex("foreground.png") if not tall_bg else null
 		if fg:
 			var fsc := BASE_W / float(fg.get_width()) * 1.12
@@ -727,6 +736,106 @@ func _update_atmosphere() -> void:
 		fn.position = Vector2(ff["nx"] * vw + sin(t * 0.6 + ph) * 14.0, ff["ny"] + cos(t * 0.5 + ph) * 10.0)
 		fn.self_modulate.a = night * (0.35 + 0.45 * (0.5 + 0.5 * sin(t * 2.2 + ph)))
 
+func _setup_zen_life_overlay() -> void:
+	if zen_life_active:
+		return
+	zen_life_layer = Node2D.new()
+	zen_life_layer.z_index = -70
+	add_child(zen_life_layer)
+
+	zen_life_petals = CPUParticles2D.new()
+	zen_life_petals.amount = 54
+	zen_life_petals.lifetime = 8.5
+	zen_life_petals.preprocess = 5.0
+	zen_life_petals.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	zen_life_petals.direction = Vector2(0.45, 1.0)
+	zen_life_petals.spread = 32.0
+	zen_life_petals.gravity = Vector2(-18, 30)
+	zen_life_petals.initial_velocity_min = 18.0
+	zen_life_petals.initial_velocity_max = 48.0
+	zen_life_petals.angular_velocity_min = -140.0
+	zen_life_petals.angular_velocity_max = 140.0
+	zen_life_petals.scale_amount_min = 0.28
+	zen_life_petals.scale_amount_max = 0.58
+	zen_life_petals.texture = _tex(THEME_DIR + "petal.svg")
+	zen_life_petals.color = Color(1, 1, 1, 0.82)
+	zen_life_layer.add_child(zen_life_petals)
+
+	for i in range(7):
+		var cl := _make_cloud()
+		cl.scale = Vector2(randf_range(0.9, 1.8), randf_range(0.8, 1.35))
+		zen_life_layer.add_child(cl)
+		zen_life_clouds.append({"node": cl, "nx": randf(), "ny": randf_range(70.0, 430.0),
+				"speed": randf_range(0.004, 0.011), "alpha": randf_range(0.12, 0.28)})
+	for i in range(5):
+		var bird := _make_bird()
+		bird.scale = Vector2(0.75, 0.75)
+		zen_life_layer.add_child(bird)
+		zen_life_birds.append({"node": bird, "nx": randf(), "ny": randf_range(95.0, 390.0),
+				"speed": randf_range(0.018, 0.034)})
+	for i in range(4):
+		var kite := _make_zen_kite(i)
+		zen_life_layer.add_child(kite)
+		zen_life_kites.append({"node": kite, "nx": randf(), "ny": randf_range(80.0, 500.0),
+				"speed": randf_range(0.006, 0.015), "amp": randf_range(10.0, 32.0),
+				"phase": randf() * TAU})
+	for i in range(34):
+		var petal := Polygon2D.new()
+		petal.polygon = PackedVector2Array([Vector2(0, -3), Vector2(5, 0), Vector2(0, 3), Vector2(-5, 0)])
+		petal.color = [Color("F2B1D1"), Color("FFD0E2"), Color("E99AC2")][i % 3]
+		petal.scale = Vector2(randf_range(0.7, 1.25), randf_range(0.7, 1.25))
+		zen_life_layer.add_child(petal)
+		zen_life_falling.append({"node": petal, "nx": randf(), "ny": randf(),
+				"speed": randf_range(0.018, 0.05), "drift": randf_range(-38.0, 46.0),
+				"phase": randf() * TAU})
+	zen_life_active = true
+
+func _update_zen_life() -> void:
+	if not zen_life_active:
+		return
+	var vr := get_viewport().get_visible_rect().size
+	var vw := vr.x
+	var vh := vr.y
+	if camera:
+		zen_life_layer.position = Vector2(base_x - vw * 0.5, camera.position.y - vh * 0.5)
+	var dt := get_process_delta_time()
+	var climb := 0.0
+	if camera:
+		climb = maxf(0.0, start_cam_y - camera.position.y)
+	var lower_phase := 1.0 - clampf(climb / 2200.0, 0.0, 1.0)
+	var sky_phase := clampf((climb - 1200.0) / 2600.0, 0.0, 1.0)
+	var t := Time.get_ticks_msec() / 1000.0
+
+	zen_life_petals.position = Vector2(vw * 0.5, -24.0)
+	zen_life_petals.emission_rect_extents = Vector2(vw * 0.54, 8.0)
+	zen_life_petals.amount = int(lerp(18.0, 58.0, lower_phase))
+	zen_life_petals.self_modulate.a = lerp(0.25, 0.95, lower_phase)
+
+	for c in zen_life_clouds:
+		c["nx"] = fmod(float(c["nx"]) + float(c["speed"]) * dt, 1.0)
+		var cn: Node2D = c["node"]
+		cn.position = Vector2(lerp(-260.0, vw + 260.0, float(c["nx"])), float(c["ny"]))
+		cn.modulate = Color(1, 1, 1, lerp(float(c["alpha"]) * 0.55, float(c["alpha"]) * 1.8, sky_phase))
+	for b in zen_life_birds:
+		b["nx"] = fmod(float(b["nx"]) + float(b["speed"]) * dt, 1.0)
+		var bn: Node2D = b["node"]
+		bn.position = Vector2(lerp(-120.0, vw + 120.0, float(b["nx"])), float(b["ny"]) + sin(t * 0.8 + float(b["nx"]) * TAU) * 9.0)
+		bn.modulate.a = lerp(0.25, 0.82, sky_phase)
+	for k in zen_life_kites:
+		k["nx"] = fmod(float(k["nx"]) + float(k["speed"]) * dt, 1.0)
+		var kn: Node2D = k["node"]
+		var y: float = float(k["ny"]) + sin(t * 0.85 + float(k["phase"])) * float(k["amp"])
+		kn.position = Vector2(lerp(-190.0, vw + 190.0, float(k["nx"])), y)
+		kn.modulate.a = lerp(0.0, 0.55, sky_phase)
+	for p in zen_life_falling:
+		p["ny"] = fmod(float(p["ny"]) + float(p["speed"]) * dt, 1.0)
+		var pn: Polygon2D = p["node"]
+		var y: float = lerp(-40.0, vh + 80.0, float(p["ny"]))
+		var x: float = float(p["nx"]) * vw + sin(t * 0.9 + float(p["phase"])) * float(p["drift"])
+		pn.position = Vector2(fposmod(x, vw + 80.0) - 40.0, y)
+		pn.rotation = t * 1.8 + float(p["phase"])
+		pn.modulate.a = lerp(0.08, 0.72, lower_phase)
+
 func _add_bg_layer(tex: Texture2D, z: int, drift: float, bottom_y: float, mode: String, scale: float, sway: bool) -> Sprite2D:
 	var sp := Sprite2D.new()
 	sp.texture = tex
@@ -840,7 +949,7 @@ func _make_bird() -> Node2D:
 
 func _make_zen_kite(kind: int) -> Node2D:
 	var n := Node2D.new()
-	n.scale = Vector2(0.72, 0.72)
+	n.scale = Vector2(0.46, 0.46)
 	var colors := [Color("D95050"), Color("3F75D8"), Color("E7A84D"), Color("2F8F74")]
 	if kind % 2 == 0:
 		var body := Polygon2D.new()
@@ -1304,6 +1413,7 @@ func _process(delta: float) -> void:
 		camera.position.y = lerp(camera.position.y, target_y, clamp(delta * 3.0, 0.0, 1.0))
 	_update_parallax()
 	_update_atmosphere()
+	_update_zen_life()
 	_update_diner()
 	_update_airport()
 	if dbg_label:
@@ -3300,7 +3410,9 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * 1.34 / float(tex.get_height()))
+		var visual_h: float = [1.52, 1.46, 1.58][ti % 3]
+		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
+		spr.position.y = float([2.0, 0.0, 3.0][ti % 3])
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
