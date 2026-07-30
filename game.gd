@@ -1473,7 +1473,9 @@ func _setup_pedestal() -> void:
 		ped_tex = _skin_tex("pedestal.png")
 	var stones_arr: Array = theme.get("stones", [])
 	if ped_tex:
-		ped.add_child(_sprite_scaled_to_width(ped_tex, ssize.x))
+		var ped_sp := _sprite_scaled_to_width(ped_tex, ssize.x * 1.34)
+		ped_sp.position.y = -8.0
+		ped.add_child(ped_sp)
 	elif stones_arr.size() > 0:
 		# Нет отдельного постамента — кладём камень как основание.
 		ped.add_child(_sprite_scaled_to_width(stones_arr[0], ssize.x))
