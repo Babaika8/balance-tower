@@ -2119,7 +2119,11 @@ func _top_color(tex: Texture2D) -> Color:
 	return Color(0.1, 0.08, 0.15)
 
 func _pick_stone() -> int:
-	# Diner — тип блина (0/1/2), Дзен — тип камня (0/1/2).
+	if skin == 0:
+		if score == 0:
+			return 0
+		return 1 + randi() % 11
+	# Diner — тип блина (0/1/2), Airport — тип чемодана (0/1/2).
 	return randi() % 3
 
 # Возвращает узел «кирпичика» башни: блинчик (Diner) или камень (Дзен, 3 вида).
@@ -3654,9 +3658,9 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var visual_h: float = [1.16, 1.12, 1.14, 1.18, 1.12, 1.15, 1.10, 1.12, 1.16, 1.14, 1.18, 1.13][ti % 12]
+		var visual_h: float = [1.46, 1.50, 1.52, 1.54, 1.50, 1.52, 1.48, 1.50, 1.53, 1.52, 1.54, 1.51][ti % 12]
 		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
-		spr.position.y = float([2.0, 2.0, 2.0, 3.0, 2.0, 2.0, 1.0, 2.0, 2.0, 2.0, 3.0, 2.0][ti % 12])
+		spr.position.y = float([13.0, 13.0, 13.0, 14.0, 13.0, 13.0, 12.0, 13.0, 13.0, 13.0, 14.0, 13.0][ti % 12])
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
