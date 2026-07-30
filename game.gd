@@ -926,6 +926,8 @@ func _update_parallax() -> void:
 	for L in bg_layers:
 		var node: Sprite2D = L["node"]
 		var scale: float = L["scale"]
+		if String(L["mode"]) == "center":
+			scale = maxf(scale, vw / float(maxf(1.0, L["art_w"])))
 		var scale_y: float = L.get("scale_y", scale)
 		var sw: float = L["art_w"] * scale
 		var sh: float = L["art_h"] * scale_y
@@ -936,6 +938,7 @@ func _update_parallax() -> void:
 				x = view_left + sw / 2.0
 			"edge_right":
 				x = view_right - sw / 2.0
+		node.scale = Vector2(scale, scale_y)
 		node.position = Vector2(x, world_bottom - sh / 2.0)
 
 # Небо над дальним планом: звёзды, облака, птица, дракон, воздушный шар.
@@ -3631,7 +3634,6 @@ func _zen_stone_texs_get() -> Array:
 	if not _zen_stone_texs_loaded:
 		_zen_stone_texs_loaded = true
 		for p in [
-				"stone.png",
 				"stone2.png",
 				"stone3.png",
 				"stone4.png",
@@ -3642,10 +3644,7 @@ func _zen_stone_texs_get() -> Array:
 				"stone9.png",
 				"stone10.png",
 				"stone11.png",
-				"stone12.png",
-				"stone_px.png",
-				"stone_px2.png",
-				"stone_px3.png"]:
+				"stone12.png"]:
 			var tex := _skin_tex(p)
 			if tex:
 				_zen_stone_texs.append(tex)
