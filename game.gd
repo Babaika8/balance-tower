@@ -188,7 +188,10 @@ func _auto_shot() -> void:
 		get_tree().quit()
 		return
 	await get_tree().create_timer(0.5).timeout
-	for i in range(5):
+	var shot_drops := 5
+	if OS.get_environment("BT_DROPS") != "":
+		shot_drops = maxi(0, int(OS.get_environment("BT_DROPS")))
+	for i in range(shot_drops):
 		var tries := 0
 		while tries < 200 and (carrier == null or state != State.WAITING
 				or absf(carrier.position.x - base_x) > 8.0):
