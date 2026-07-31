@@ -3635,7 +3635,6 @@ func _zen_stone_texs_get() -> Array:
 		_zen_stone_texs_loaded = true
 		for p in [
 				"stone2.png",
-				"stone3.png",
 				"stone4.png",
 				"stone5.png",
 				"stone7.png",
