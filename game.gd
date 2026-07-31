@@ -788,11 +788,16 @@ func _setup_zen_life_overlay() -> void:
 		zen_life_layer.add_child(glow)
 		zen_life_glows.append({"node": glow, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
 				"alpha": randf_range(0.04, 0.10)})
-	for pos in [[28.0, 550.0, -1.0], [62.0, 700.0, -1.0], [684.0, 570.0, 1.0], [652.0, 740.0, 1.0]]:
+	for pos in [[18.0, 500.0, -1.0], [42.0, 620.0, -1.0], [74.0, 760.0, -1.0], [704.0, 520.0, 1.0], [676.0, 655.0, 1.0], [642.0, 800.0, 1.0]]:
 		var bamboo := _make_bamboo_sway(float(pos[2]))
 		zen_life_layer.add_child(bamboo)
 		zen_life_bamboo.append({"node": bamboo, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
-				"amp": randf_range(0.016, 0.030)})
+				"amp": randf_range(0.040, 0.070)})
+	for pos in [[-12.0, 350.0, -1.0], [732.0, 390.0, 1.0], [22.0, 930.0, -1.0], [700.0, 1010.0, 1.0]]:
+		var branch := _make_sakura_branch(float(pos[2]))
+		zen_life_layer.add_child(branch)
+		zen_life_bamboo.append({"node": branch, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
+				"amp": randf_range(0.032, 0.055)})
 	for pos in [[78.0, 765.0], [648.0, 985.0], [564.0, 666.0]]:
 		var lantern := _make_hanging_lantern()
 		zen_life_layer.add_child(lantern)
@@ -882,7 +887,7 @@ func _update_zen_life() -> void:
 		var bn: Node2D = bmb["node"]
 		bn.position = Vector2(float(bmb["x"]), float(bmb["y"]))
 		bn.rotation = sin(t * 0.9 + float(bmb["phase"])) * float(bmb["amp"])
-		bn.modulate.a = lerp(0.50, 0.92, lower_phase)
+		bn.modulate.a = lerp(0.62, 1.0, lower_phase)
 	for ldata in zen_life_lanterns:
 		var ln: Node2D = ldata["node"]
 		ln.position = Vector2(float(ldata["x"]), float(ldata["y"]))
@@ -1046,12 +1051,44 @@ func _make_bamboo_sway(side: float) -> Node2D:
 			n.add_child(leaf)
 	return n
 
+func _make_sakura_branch(side: float) -> Node2D:
+	var n := Node2D.new()
+	n.z_index = -66
+	var branch := Line2D.new()
+	branch.width = 5.0
+	branch.default_color = Color(0.20, 0.15, 0.13, 0.72)
+	branch.points = PackedVector2Array([
+		Vector2(0, 0),
+		Vector2(side * 46.0, 10.0),
+		Vector2(side * 92.0, 4.0),
+		Vector2(side * 138.0, 18.0)
+	])
+	branch.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	branch.end_cap_mode = Line2D.LINE_CAP_ROUND
+	n.add_child(branch)
+	for i in range(9):
+		var twig := Line2D.new()
+		twig.width = 2.0
+		twig.default_color = Color(0.16, 0.11, 0.10, 0.60)
+		var bx := side * randf_range(28.0, 132.0)
+		var by := randf_range(0.0, 22.0)
+		twig.points = PackedVector2Array([Vector2(bx, by), Vector2(bx + side * randf_range(18.0, 42.0), by + randf_range(-28.0, 18.0))])
+		n.add_child(twig)
+	for i in range(34):
+		var blossom := Polygon2D.new()
+		var r := randf_range(3.0, 6.0)
+		blossom.polygon = PackedVector2Array([Vector2(0, -r), Vector2(r, 0), Vector2(0, r), Vector2(-r, 0)])
+		blossom.color = [Color("F2A6C8", 0.72), Color("FFD2E0", 0.68), Color("D982AE", 0.58)][i % 3]
+		blossom.position = Vector2(side * randf_range(28.0, 164.0), randf_range(-30.0, 34.0))
+		n.add_child(blossom)
+	return n
+
 func _make_zen_tree_sway_material() -> ShaderMaterial:
 	var sh := Shader.new()
 	sh.code = """
 shader_type canvas_item;
 
-uniform float sway_strength = 0.0046;
+uniform float sway_strength = 0.0064;
 uniform float sway_speed = 0.78;
 
 float foliage_mask(vec4 c) {
