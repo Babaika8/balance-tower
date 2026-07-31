@@ -3638,10 +3638,8 @@ func _zen_stone_texs_get() -> Array:
 				"stone3.png",
 				"stone4.png",
 				"stone5.png",
-				"stone6.png",
 				"stone7.png",
 				"stone8.png",
-				"stone9.png",
 				"stone10.png",
 				"stone11.png",
 				"stone12.png"]:
