@@ -146,7 +146,6 @@ var zen_life_kites: Array = []   # {node, nx, ny, speed, amp, phase}
 var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
 var zen_life_fog: Array = []     # {node, nx, ny, speed, alpha}
 var zen_life_water: Array = []   # {node, x, y, phase, alpha}
-var zen_life_waterfalls: Array = [] # {node, x, y, phase, alpha, len}
 var zen_life_glows: Array = []   # {node, x, y, phase, alpha}
 var zen_life_bamboo: Array = []  # {node, x, y, phase, amp}
 var zen_life_lanterns: Array = [] # {node, x, y, phase}
@@ -774,22 +773,16 @@ func _setup_zen_life_overlay() -> void:
 	zen_life_petals.color = Color(1, 1, 1, 0.82)
 	zen_life_layer.add_child(zen_life_petals)
 
-	for i in range(7):
+	for i in range(4):
 		var fog := _make_fog_band()
 		zen_life_layer.add_child(fog)
-		zen_life_fog.append({"node": fog, "nx": randf(), "ny": [155.0, 260.0, 390.0, 515.0, 650.0, 780.0, 910.0][i],
-				"speed": randf_range(0.010, 0.024), "alpha": randf_range(0.055, 0.125)})
-	for pos in [[64.0, 760.0], [92.0, 850.0], [112.0, 940.0], [610.0, 710.0], [648.0, 825.0], [660.0, 928.0], [92.0, 1060.0], [618.0, 1080.0],
-			[544.0, 790.0], [578.0, 868.0], [138.0, 900.0], [176.0, 1032.0], [602.0, 1018.0]]:
+		zen_life_fog.append({"node": fog, "nx": randf(), "ny": [210.0, 390.0, 570.0, 760.0][i],
+				"speed": randf_range(0.004, 0.010), "alpha": randf_range(0.035, 0.075)})
+	for pos in [[64.0, 760.0], [92.0, 850.0], [112.0, 940.0], [610.0, 710.0], [648.0, 825.0], [660.0, 928.0], [92.0, 1060.0], [618.0, 1080.0]]:
 		var glint := _make_water_glint()
 		zen_life_layer.add_child(glint)
 		zen_life_water.append({"node": glint, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
-				"alpha": randf_range(0.24, 0.52)})
-	for pos in [[382.0, 565.0, 78.0, 0.18], [616.0, 720.0, 86.0, 0.20], [102.0, 820.0, 70.0, 0.14]]:
-		var wf := _make_waterfall_stream(float(pos[2]))
-		zen_life_layer.add_child(wf)
-		zen_life_waterfalls.append({"node": wf, "x": pos[0], "y": pos[1], "phase": randf() * TAU,
-				"alpha": pos[3], "len": pos[2]})
+				"alpha": randf_range(0.16, 0.34)})
 	for pos in [[70.0, 1050.0], [650.0, 1055.0], [160.0, 715.0], [560.0, 690.0]]:
 		var glow := _make_lantern_glow()
 		zen_life_layer.add_child(glow)
@@ -814,12 +807,12 @@ func _setup_zen_life_overlay() -> void:
 		var monk_node: Node2D = monk_data["node"]
 		zen_life_layer.add_child(monk_node)
 		zen_life_monks.append({"node": monk_node, "staff": monk_data["staff"], "x": pos[0], "y": pos[1], "phase": randf() * TAU})
-	for i in range(7):
+	for i in range(3):
 		var cl := _make_cloud()
-		cl.scale = Vector2(randf_range(0.85, 1.55), randf_range(0.65, 1.12))
+		cl.scale = Vector2(randf_range(0.7, 1.2), randf_range(0.6, 1.0))
 		zen_life_layer.add_child(cl)
-		zen_life_clouds.append({"node": cl, "nx": randf(), "ny": randf_range(65.0, 420.0),
-				"speed": randf_range(0.006, 0.014), "alpha": randf_range(0.11, 0.22)})
+		zen_life_clouds.append({"node": cl, "nx": randf(), "ny": randf_range(80.0, 260.0),
+				"speed": randf_range(0.003, 0.007), "alpha": randf_range(0.06, 0.12)})
 	for i in range(34):
 		var petal := Polygon2D.new()
 		petal.polygon = PackedVector2Array([Vector2(0, -3), Vector2(5, 0), Vector2(0, 3), Vector2(-5, 0)])
@@ -855,9 +848,8 @@ func _update_zen_life() -> void:
 	for c in zen_life_clouds:
 		c["nx"] = fmod(float(c["nx"]) + float(c["speed"]) * dt, 1.0)
 		var cn: Node2D = c["node"]
-		cn.position = Vector2(lerp(-320.0, vw + 320.0, float(c["nx"])),
-				float(c["ny"]) + sin(t * 0.22 + float(c["nx"]) * TAU) * 8.0)
-		cn.modulate = Color(1, 1, 1, lerp(float(c["alpha"]) * 0.85, float(c["alpha"]) * 1.9, sky_phase))
+		cn.position = Vector2(lerp(-260.0, vw + 260.0, float(c["nx"])), float(c["ny"]))
+		cn.modulate = Color(1, 1, 1, lerp(float(c["alpha"]) * 0.55, float(c["alpha"]) * 1.8, sky_phase))
 	for b in zen_life_birds:
 		b["nx"] = fmod(float(b["nx"]) + float(b["speed"]) * dt, 1.0)
 		var bn: Node2D = b["node"]
@@ -880,24 +872,12 @@ func _update_zen_life() -> void:
 	for fband in zen_life_fog:
 		fband["nx"] = fmod(float(fband["nx"]) + float(fband["speed"]) * dt, 1.0)
 		var fn: Line2D = fband["node"]
-		fn.position = Vector2(lerp(-300.0, 300.0, float(fband["nx"])),
-				float(fband["ny"]) + sin(t * 0.38 + float(fband["nx"]) * TAU) * 10.0)
-		fn.modulate.a = float(fband["alpha"]) * (0.72 + 0.28 * sin(t * 0.55 + float(fband["nx"]) * TAU)) * lerp(1.0, 0.55, sky_phase)
+		fn.position = Vector2(lerp(-180.0, 180.0, float(fband["nx"])), float(fband["ny"]))
+		fn.modulate.a = float(fband["alpha"]) * lerp(1.0, 0.45, sky_phase)
 	for w in zen_life_water:
 		var wn: Line2D = w["node"]
-		wn.position = Vector2(float(w["x"]) + sin(t * 1.5 + float(w["phase"])) * 16.0,
-				float(w["y"]) + sin(t * 2.2 + float(w["phase"]) * 0.7) * 3.0)
-		wn.modulate.a = float(w["alpha"]) * (0.35 + 0.65 * (0.5 + 0.5 * sin(t * 3.4 + float(w["phase"]))))
-	for wf in zen_life_waterfalls:
-		var wfn: Node2D = wf["node"]
-		wfn.position = Vector2(float(wf["x"]) + sin(t * 0.7 + float(wf["phase"])) * 2.0, float(wf["y"]))
-		wfn.modulate.a = float(wf["alpha"]) * (0.62 + 0.38 * sin(t * 1.4 + float(wf["phase"])))
-		var idx := 0
-		for child in wfn.get_children():
-			if child is Line2D:
-				var line := child as Line2D
-				line.position.y = fposmod(t * (22.0 + idx * 7.0) + float(wf["phase"]) * 8.0 + idx * 12.0, float(wf["len"])) - float(wf["len"]) * 0.5
-				idx += 1
+		wn.position = Vector2(float(w["x"]), float(w["y"]))
+		wn.modulate.a = float(w["alpha"]) * (0.45 + 0.55 * (0.5 + 0.5 * sin(t * 2.4 + float(w["phase"]))))
 	for g in zen_life_glows:
 		var gn: Polygon2D = g["node"]
 		gn.position = Vector2(float(g["x"]), float(g["y"]))
@@ -1024,10 +1004,10 @@ func _make_cloud() -> Node2D:
 
 func _make_fog_band() -> Line2D:
 	var l := Line2D.new()
-	l.width = randf_range(10.0, 22.0)
-	l.default_color = Color(0.86, 0.94, 1.0, 1.0)
+	l.width = randf_range(7.0, 14.0)
+	l.default_color = Color(0.86, 0.92, 1.0, 1.0)
 	l.points = PackedVector2Array([
-		Vector2(-180, 0), Vector2(50, -8), Vector2(280, 4), Vector2(540, -7), Vector2(900, 3)
+		Vector2(-120, 0), Vector2(80, -6), Vector2(280, 3), Vector2(500, -5), Vector2(780, 2)
 	])
 	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	l.end_cap_mode = Line2D.LINE_CAP_ROUND
@@ -1035,29 +1015,13 @@ func _make_fog_band() -> Line2D:
 
 func _make_water_glint() -> Line2D:
 	var l := Line2D.new()
-	l.width = randf_range(2.5, 5.0)
-	l.default_color = Color(0.72, 0.95, 1.0, 1.0)
-	var w := randf_range(34.0, 86.0)
+	l.width = randf_range(1.5, 3.0)
+	l.default_color = Color(0.68, 0.92, 1.0, 1.0)
+	var w := randf_range(24.0, 58.0)
 	l.points = PackedVector2Array([Vector2(-w * 0.5, 0), Vector2(w * 0.5, randf_range(-2.0, 2.0))])
 	l.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	l.end_cap_mode = Line2D.LINE_CAP_ROUND
 	return l
-
-func _make_waterfall_stream(len: float) -> Node2D:
-	var n := Node2D.new()
-	n.z_index = -64
-	for i in range(5):
-		var l := Line2D.new()
-		l.width = [2.0, 3.0, 2.0, 4.0, 2.0][i]
-		l.default_color = Color(0.78, 0.94, 1.0, 1.0)
-		var x := float(i - 2) * 5.0 + randf_range(-2.0, 2.0)
-		var h := len * randf_range(0.28, 0.58)
-		l.points = PackedVector2Array([Vector2(x, -h * 0.5), Vector2(x + randf_range(-2.0, 2.0), h * 0.5)])
-		l.begin_cap_mode = Line2D.LINE_CAP_ROUND
-		l.end_cap_mode = Line2D.LINE_CAP_ROUND
-		l.modulate.a = randf_range(0.45, 0.9)
-		n.add_child(l)
-	return n
 
 func _make_lantern_glow() -> Polygon2D:
 	var p := Polygon2D.new()
@@ -1124,14 +1088,14 @@ func _make_zen_tree_sway_material() -> ShaderMaterial:
 	sh.code = """
 shader_type canvas_item;
 
-uniform float sway_strength = 0.0105;
+uniform float sway_strength = 0.0064;
 uniform float sway_speed = 0.78;
 
 float foliage_mask(vec4 c) {
 	float mx = max(c.r, max(c.g, c.b));
 	float mn = min(c.r, min(c.g, c.b));
 	float sat = mx - mn;
-	float green = smoothstep(0.005, 0.105, c.g - max(c.r * 0.82, c.b * 0.66));
+	float green = smoothstep(0.035, 0.16, c.g - max(c.r * 0.88, c.b * 0.72));
 	float sakura = smoothstep(0.035, 0.16, c.r - c.g) * smoothstep(0.0, 0.14, c.b - c.g * 0.70);
 	return clamp((green + sakura) * smoothstep(0.035, 0.22, sat) * c.a, 0.0, 1.0);
 }
