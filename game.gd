@@ -314,7 +314,9 @@ func _setup_background() -> void:
 		if scn:
 			var ssc := BASE_W / float(scn.get_width()) * (1.0 if tall_bg else 1.04)
 			var drift := 0.62 if tall_bg else 0.08
-			_add_bg_layer(scn, -90, drift, 1500.0, "center", ssc, false)
+			var bg_sp := _add_bg_layer(scn, -90, drift, 1500.0, "center", ssc, false)
+			if tall_bg:
+				bg_sp.material = _make_zen_tree_sway_material()
 			if tall_bg:
 				_setup_zen_life_overlay()
 		var fg := _skin_tex("foreground.png") if not tall_bg else null
@@ -1043,6 +1045,39 @@ func _make_bamboo_sway(side: float) -> Node2D:
 			leaf.color = [Color("5CA875"), Color("7CC58B"), Color("3E7C58")][(i + j) % 3]
 			n.add_child(leaf)
 	return n
+
+func _make_zen_tree_sway_material() -> ShaderMaterial:
+	var sh := Shader.new()
+	sh.code = """
+shader_type canvas_item;
+
+uniform float sway_strength = 0.0046;
+uniform float sway_speed = 0.78;
+
+float foliage_mask(vec4 c) {
+	float mx = max(c.r, max(c.g, c.b));
+	float mn = min(c.r, min(c.g, c.b));
+	float sat = mx - mn;
+	float green = smoothstep(0.035, 0.16, c.g - max(c.r * 0.88, c.b * 0.72));
+	float sakura = smoothstep(0.035, 0.16, c.r - c.g) * smoothstep(0.0, 0.14, c.b - c.g * 0.70);
+	return clamp((green + sakura) * smoothstep(0.035, 0.22, sat) * c.a, 0.0, 1.0);
+}
+
+void fragment() {
+	vec2 uv = UV;
+	vec4 base = texture(TEXTURE, uv);
+	float side = smoothstep(0.18, 0.02, uv.x) + smoothstep(0.82, 0.98, uv.x);
+	float height_band = smoothstep(0.12, 0.86, uv.y);
+	float mask = foliage_mask(base) * (0.35 + side * 0.85) * height_band;
+	float wave = sin(TIME * sway_speed + uv.y * 24.0 + uv.x * 7.0);
+	float wave2 = sin(TIME * (sway_speed * 0.63) + uv.y * 41.0);
+	vec2 offset = vec2((wave * 0.72 + wave2 * 0.28) * sway_strength * mask, 0.0);
+	COLOR = mix(base, texture(TEXTURE, uv - offset), mask * 0.85);
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = sh
+	return mat
 
 func _make_hanging_lantern() -> Node2D:
 	var n := Node2D.new()
