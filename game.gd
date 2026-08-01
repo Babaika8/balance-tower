@@ -784,6 +784,7 @@ func _setup_zen_life_overlay() -> void:
 	_add_zen_slice("anim/foliage_left.png", 0.0, 270.0, "foliage", 0.68, 16.0, 0.95)
 	_add_zen_slice("anim/foliage_right.png", 490.0, 240.0, "foliage", 0.72, 17.0, 0.88)
 	_add_zen_frame_layer("layers/foreground_right_rest.png", "layers/foreground_right_sway.png", Vector2(165.0, 190.0), 0.50, 0.76)
+	_add_zen_frame_layer("layers/waterfall_right_rest.png", "layers/waterfall_right_flow.png", Vector2(280.0, 650.0), 0.25, 0.50, 2.2)
 	for pos in [[70.0, 1050.0], [650.0, 1055.0], [160.0, 715.0], [560.0, 690.0]]:
 		var glow := _make_lantern_glow()
 		zen_life_layer.add_child(glow)
@@ -862,7 +863,7 @@ func _update_zen_life() -> void:
 	for fdata in zen_life_frame_layers:
 		var rest: Sprite2D = fdata["rest"]
 		var sway: Sprite2D = fdata["sway"]
-		var pulse := 0.5 + 0.5 * sin(t * 0.62 + float(fdata["phase"]))
+		var pulse := 0.5 + 0.5 * sin(t * float(fdata["speed"]) + float(fdata["phase"]))
 		var alpha := float(fdata["alpha"]) * lower_phase
 		rest.modulate.a = alpha * (1.0 - pulse)
 		sway.modulate.a = alpha * pulse
@@ -1041,7 +1042,7 @@ func _add_zen_slice(name: String, x: float, y: float, kind: String, alpha: float
 		"phase": randf() * TAU, "amp": amp, "speed": speed, "alpha": alpha,
 	})
 
-func _add_zen_frame_layer(rest_name: String, sway_name: String, pos: Vector2, scale_factor: float, alpha: float) -> void:
+func _add_zen_frame_layer(rest_name: String, sway_name: String, pos: Vector2, scale_factor: float, alpha: float, speed: float = 0.62) -> void:
 	var rest_tex := _skin_tex(rest_name)
 	var sway_tex := _skin_tex(sway_name)
 	if not rest_tex or not sway_tex:
@@ -1062,7 +1063,7 @@ func _add_zen_frame_layer(rest_name: String, sway_name: String, pos: Vector2, sc
 	sway.scale = Vector2.ONE * scale_factor
 	sway.z_index = -58
 	zen_life_layer.add_child(sway)
-	zen_life_frame_layers.append({"rest": rest, "sway": sway, "phase": randf() * TAU, "alpha": alpha})
+	zen_life_frame_layers.append({"rest": rest, "sway": sway, "phase": randf() * TAU, "alpha": alpha, "speed": speed})
 
 func _make_fog_band() -> Line2D:
 	var l := Line2D.new()
