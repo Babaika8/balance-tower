@@ -147,6 +147,7 @@ var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
 var zen_life_fog: Array = []     # {node, nx, ny, speed, alpha}
 var zen_life_water: Array = []   # {node, x, y, phase, alpha}
 var zen_life_slices: Array = []  # крупные PNG-слои из фона: {node, x, y, kind, phase, amp, speed, alpha}
+var zen_life_frame_layers: Array = [] # нарисованные покадровые слои: {rest, sway, phase, alpha}
 var zen_life_glows: Array = []   # {node, x, y, phase, alpha}
 var zen_life_bamboo: Array = []  # {node, x, y, phase, amp}
 var zen_life_lanterns: Array = [] # {node, x, y, phase}
@@ -751,7 +752,9 @@ func _setup_zen_life_overlay() -> void:
 	if zen_life_active:
 		return
 	zen_life_layer = Node2D.new()
-	zen_life_layer.z_index = -70
+	# Дети слоя уже имеют свои отрицательные z-уровни. Сам контейнер должен
+	# оставаться на нуле, иначе они суммируются и уходят за цельный фон (-90).
+	zen_life_layer.z_index = 0
 	add_child(zen_life_layer)
 
 	zen_life_petals = CPUParticles2D.new()
@@ -780,6 +783,7 @@ func _setup_zen_life_overlay() -> void:
 	_add_zen_slice("anim/waterfall_right.png", 555.0, 560.0, "waterfall", 0.78, 20.0, 2.05)
 	_add_zen_slice("anim/foliage_left.png", 0.0, 270.0, "foliage", 0.68, 16.0, 0.95)
 	_add_zen_slice("anim/foliage_right.png", 490.0, 240.0, "foliage", 0.72, 17.0, 0.88)
+	_add_zen_frame_layer("layers/foreground_right_rest.png", "layers/foreground_right_sway.png", Vector2(165.0, 190.0), 0.50, 0.76)
 	for pos in [[70.0, 1050.0], [650.0, 1055.0], [160.0, 715.0], [560.0, 690.0]]:
 		var glow := _make_lantern_glow()
 		zen_life_layer.add_child(glow)
@@ -852,6 +856,16 @@ func _update_zen_life() -> void:
 				sn.rotation = sin(t * speed + phase) * 0.024
 				sn.scale = Vector2(1.0 + 0.020 * sin(t * speed * 1.2 + phase), 1.0)
 				sn.modulate.a = float(sdata["alpha"]) * lerp(0.75, 1.0, lower_phase)
+
+	# Это не сдвиг готового прямоугольника: две отдельно нарисованные позы кроны
+	# мягко сменяют друг друга, поэтому ветки действительно меняют силуэт на ветру.
+	for fdata in zen_life_frame_layers:
+		var rest: Sprite2D = fdata["rest"]
+		var sway: Sprite2D = fdata["sway"]
+		var pulse := 0.5 + 0.5 * sin(t * 0.62 + float(fdata["phase"]))
+		var alpha := float(fdata["alpha"]) * lower_phase
+		rest.modulate.a = alpha * (1.0 - pulse)
+		sway.modulate.a = alpha * pulse
 
 	for c in zen_life_clouds:
 		c["nx"] = fmod(float(c["nx"]) + float(c["speed"]) * dt, 1.0)
@@ -1026,6 +1040,29 @@ func _add_zen_slice(name: String, x: float, y: float, kind: String, alpha: float
 		"node": sp, "x": x, "y": y, "kind": kind,
 		"phase": randf() * TAU, "amp": amp, "speed": speed, "alpha": alpha,
 	})
+
+func _add_zen_frame_layer(rest_name: String, sway_name: String, pos: Vector2, scale_factor: float, alpha: float) -> void:
+	var rest_tex := _skin_tex(rest_name)
+	var sway_tex := _skin_tex(sway_name)
+	if not rest_tex or not sway_tex:
+		return
+	var rest := Sprite2D.new()
+	rest.texture = rest_tex
+	rest.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	rest.centered = false
+	rest.position = pos
+	rest.scale = Vector2.ONE * scale_factor
+	rest.z_index = -58
+	zen_life_layer.add_child(rest)
+	var sway := Sprite2D.new()
+	sway.texture = sway_tex
+	sway.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sway.centered = false
+	sway.position = pos
+	sway.scale = Vector2.ONE * scale_factor
+	sway.z_index = -58
+	zen_life_layer.add_child(sway)
+	zen_life_frame_layers.append({"rest": rest, "sway": sway, "phase": randf() * TAU, "alpha": alpha})
 
 func _make_fog_band() -> Line2D:
 	var l := Line2D.new()
