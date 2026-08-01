@@ -146,7 +146,7 @@ var zen_life_kites: Array = []   # {node, nx, ny, speed, amp, phase}
 var zen_life_falling: Array = [] # {node, nx, ny, speed, drift, phase}
 var zen_life_fog: Array = []     # {node, nx, ny, speed, alpha}
 var zen_life_water: Array = []   # {node, x, y, phase, alpha}
-var zen_life_slices: Array = []  # нарезанные PNG из фона: {node, x, y, kind, phase, amp, speed, alpha}
+var zen_life_slices: Array = []  # крупные PNG-слои из фона: {node, x, y, kind, phase, amp, speed, alpha}
 var zen_life_glows: Array = []   # {node, x, y, phase, alpha}
 var zen_life_bamboo: Array = []  # {node, x, y, phase, amp}
 var zen_life_lanterns: Array = [] # {node, x, y, phase}
@@ -772,14 +772,14 @@ func _setup_zen_life_overlay() -> void:
 	zen_life_petals.color = Color(1, 1, 1, 0.82)
 	zen_life_layer.add_child(zen_life_petals)
 
-	_add_zen_slice("anim/clouds_high.png", 55.0, 0.0, "cloud", 0.20, 10.0, 0.010)
-	_add_zen_slice("anim/mist_mid.png", 105.0, 80.0, "mist", 0.24, 18.0, 0.014)
-	_add_zen_slice("anim/water_left.png", 18.0, 720.0, "water", 0.70, 7.0, 0.75)
-	_add_zen_slice("anim/water_right.png", 500.0, 650.0, "water", 0.76, 7.0, 0.82)
-	_add_zen_slice("anim/waterfall_far.png", 350.0, 360.0, "waterfall", 0.42, 9.0, 1.20)
-	_add_zen_slice("anim/waterfall_right.png", 555.0, 560.0, "waterfall", 0.50, 10.0, 1.35)
-	_add_zen_slice("anim/foliage_left.png", 0.0, 270.0, "foliage", 0.30, 4.0, 0.70)
-	_add_zen_slice("anim/foliage_right.png", 490.0, 240.0, "foliage", 0.34, 4.5, 0.68)
+	_add_zen_slice("anim/clouds_high.png", 55.0, 0.0, "cloud", 0.42, 58.0, 0.055)
+	_add_zen_slice("anim/mist_mid.png", 105.0, 80.0, "mist", 0.36, 46.0, 0.070)
+	_add_zen_slice("anim/water_left.png", 18.0, 720.0, "water", 0.88, 18.0, 1.35)
+	_add_zen_slice("anim/water_right.png", 500.0, 650.0, "water", 0.92, 18.0, 1.48)
+	_add_zen_slice("anim/waterfall_far.png", 350.0, 360.0, "waterfall", 0.72, 18.0, 1.90)
+	_add_zen_slice("anim/waterfall_right.png", 555.0, 560.0, "waterfall", 0.78, 20.0, 2.05)
+	_add_zen_slice("anim/foliage_left.png", 0.0, 270.0, "foliage", 0.68, 16.0, 0.95)
+	_add_zen_slice("anim/foliage_right.png", 490.0, 240.0, "foliage", 0.72, 17.0, 0.88)
 	for pos in [[70.0, 1050.0], [650.0, 1055.0], [160.0, 715.0], [560.0, 690.0]]:
 		var glow := _make_lantern_glow()
 		zen_life_layer.add_child(glow)
@@ -836,19 +836,22 @@ func _update_zen_life() -> void:
 		var drift := sin(t * speed + phase)
 		match kind:
 			"water":
-				sn.position = base_pos + Vector2(drift * amp, sin(t * speed * 1.9 + phase) * 2.0)
-				sn.scale = Vector2(1.0 + 0.006 * sin(t * speed * 2.4 + phase), 1.0)
-				sn.modulate.a = float(sdata["alpha"]) * (0.82 + 0.18 * sin(t * speed * 2.8 + phase))
+				sn.position = base_pos + Vector2(drift * amp, sin(t * speed * 1.9 + phase) * 6.0)
+				sn.scale = Vector2(1.0 + 0.018 * sin(t * speed * 2.4 + phase), 1.0 + 0.010 * sin(t * speed * 1.7 + phase))
+				sn.modulate.a = float(sdata["alpha"]) * (0.68 + 0.32 * sin(t * speed * 2.8 + phase))
 			"waterfall":
-				sn.position = base_pos + Vector2(sin(t * speed * 0.5 + phase) * 1.5, fposmod(t * speed * amp + phase * 3.0, 14.0) - 7.0)
-				sn.modulate.a = float(sdata["alpha"]) * (0.72 + 0.28 * sin(t * speed * 2.2 + phase))
+				sn.position = base_pos + Vector2(sin(t * speed * 0.5 + phase) * 4.0, fposmod(t * speed * amp + phase * 3.0, 26.0) - 13.0)
+				sn.scale = Vector2(1.0 + 0.012 * sin(t * speed * 1.5 + phase), 1.0)
+				sn.modulate.a = float(sdata["alpha"]) * (0.58 + 0.42 * sin(t * speed * 2.2 + phase))
 			"mist", "cloud":
-				sn.position = base_pos + Vector2(drift * amp, sin(t * speed * 0.55 + phase) * 5.0)
-				sn.modulate.a = float(sdata["alpha"]) * (0.72 + 0.28 * sin(t * speed * 0.9 + phase))
+				sn.position = base_pos + Vector2(drift * amp, sin(t * speed * 0.55 + phase) * 12.0)
+				sn.scale = Vector2(1.0 + 0.018 * sin(t * speed * 0.7 + phase), 1.0)
+				sn.modulate.a = float(sdata["alpha"]) * (0.55 + 0.45 * sin(t * speed * 0.9 + phase))
 			"foliage":
 				sn.position = base_pos + Vector2(drift * amp, 0.0)
-				sn.rotation = sin(t * speed + phase) * 0.006
-				sn.modulate.a = float(sdata["alpha"]) * lerp(0.55, 1.0, lower_phase)
+				sn.rotation = sin(t * speed + phase) * 0.024
+				sn.scale = Vector2(1.0 + 0.020 * sin(t * speed * 1.2 + phase), 1.0)
+				sn.modulate.a = float(sdata["alpha"]) * lerp(0.75, 1.0, lower_phase)
 
 	for c in zen_life_clouds:
 		c["nx"] = fmod(float(c["nx"]) + float(c["speed"]) * dt, 1.0)
