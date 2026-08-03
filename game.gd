@@ -310,16 +310,23 @@ func _setup_background() -> void:
 	layer.add_child(atmo_glow)
 
 	if ZEN_PIXEL_BG:
-		# Цельный пиксель-арт задник (сакура-горы + лес + пагода + земля) — параллакс-слой.
-		var scn := _first_skin_tex(["background_tall.png", "background_gpt_v1.png", "background.png", "scene_px.png"])
+		# Версия v2 — самостоятельная длинная сцена. Старые фрагменты анимации к ней
+		# не подмешиваются: у неё есть только заново нарисованные отдельные слои.
+		var v2_scene := _skin_tex("v2/background_tall_v2.png")
+		var scn := v2_scene if v2_scene else _first_skin_tex(["background_tall.png", "background_gpt_v1.png", "background.png", "scene_px.png"])
 		var tall_bg := scn == _skin_tex("background_tall.png")
 		if scn:
-			var ssc := BASE_W / float(scn.get_width()) * (1.0 if tall_bg else 1.04)
-			var drift := 0.62 if tall_bg else 0.08
+			# Чуть крупнее экрана: нижняя панель заполняет весь стартовый кадр,
+			# а переход к следующей высоте не попадает в видимую область.
+			var art_zoom := 1.18 if v2_scene else (1.0 if tall_bg else 1.04)
+			var ssc := BASE_W / float(scn.get_width()) * art_zoom
+			var drift := 0.62 if (tall_bg or v2_scene) else 0.08
 			_add_bg_layer(scn, -90, drift, 1500.0, "center", ssc, false)
-			if tall_bg:
+			if v2_scene:
+				_setup_zen_v2_life_overlay()
+			elif tall_bg:
 				_setup_zen_life_overlay()
-		var fg := _skin_tex("foreground.png") if not tall_bg else null
+		var fg := _skin_tex("foreground.png") if not (tall_bg or v2_scene) else null
 		if fg:
 			var fsc := BASE_W / float(fg.get_width()) * 1.12
 			_add_bg_layer(fg, -82, 0.30, 1460.0, "center", fsc, false)
@@ -808,6 +815,39 @@ func _setup_zen_life_overlay() -> void:
 		zen_life_falling.append({"node": petal, "nx": randf(), "ny": randf(),
 				"speed": randf_range(0.018, 0.05), "drift": randf_range(-38.0, 46.0),
 				"phase": randf() * TAU})
+	zen_life_active = true
+
+func _setup_zen_v2_life_overlay() -> void:
+	if zen_life_active:
+		return
+	zen_life_layer = Node2D.new()
+	zen_life_layer.z_index = 0
+	add_child(zen_life_layer)
+
+	# Лёгкие лепестки привязаны к экрану, поэтому не ломают перспективу высокой карты.
+	zen_life_petals = CPUParticles2D.new()
+	zen_life_petals.amount = 36
+	zen_life_petals.lifetime = 7.0
+	zen_life_petals.preprocess = 4.0
+	zen_life_petals.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	zen_life_petals.direction = Vector2(0.48, 1.0)
+	zen_life_petals.spread = 28.0
+	zen_life_petals.gravity = Vector2(-15, 28)
+	zen_life_petals.initial_velocity_min = 20.0
+	zen_life_petals.initial_velocity_max = 42.0
+	zen_life_petals.angular_velocity_min = -110.0
+	zen_life_petals.angular_velocity_max = 110.0
+	zen_life_petals.scale_amount_min = 0.26
+	zen_life_petals.scale_amount_max = 0.52
+	zen_life_petals.texture = _tex(THEME_DIR + "petal.svg")
+	zen_life_petals.color = Color(1, 1, 1, 0.74)
+	zen_life_layer.add_child(zen_life_petals)
+
+	# Ветви, вода и туман нарисованы отдельными PNG, а не вырезаны из фона.
+	# Скорости намеренно различаются: движение видно, но сцена не превращается в GIF-баннер.
+	_add_zen_frame_layer("v2/foreground_left_rest.png", "v2/foreground_left_sway.png", Vector2(-8.0, -8.0), 0.47, 0.92, 3.4)
+	_add_zen_frame_layer("v2/water_rest.png", "v2/water_flow.png", Vector2(0.0, 18.0), 0.76, 0.34, 6.0)
+	_add_zen_slice("v2/mist_band.png", -96.0, 248.0, "mist", 0.40, 64.0, 0.16)
 	zen_life_active = true
 
 func _update_zen_life() -> void:
