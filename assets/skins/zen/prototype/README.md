@@ -30,3 +30,12 @@ chroma-key background without cliffs, shadows, text, or extra objects.
 
 The chroma key was removed locally with the ImageGen skill helper. The source
 green-screen files are not included in the project.
+
+## Gorge section prompts
+
+The second opaque plate continues directly above the village into a mountain
+monastery gorge. Its center stays calm and misty while architecture occupies
+the cliffs. A dark left rock channel is reserved for an independent waterfall.
+
+The gorge waterfall is a muted blue-gray vertical flow with restrained moving
+highlights, natural edges, and compact foam, generated on green chroma key.

@@ -3,14 +3,17 @@
 ## Goal
 
 Prove the production approach for a living Zen background without changing the
-stacking physics. The prototype covers only the starting 720 x 1280 section.
+stacking physics. The prototype now covers the start and monastery-gorge
+sections of the vertical route.
 
 ## Architecture
 
 - `zen_start_prototype.tscn` is an isolated visual scene.
 - `zen_start_prototype.gd` owns the background animation.
 - `assets/skins/zen/prototype/start_clean.png` is the static clean plate.
+- `assets/skins/zen/prototype/gorge_clean.png` is the next 720 x 1280 plate.
 - `sakura_branch.png` and `waterfall.png` are independent alpha sprites.
+- `gorge_waterfall.png` is the animated water layer in the upper section.
 - The scene stays in world coordinates and therefore moves naturally with the
   gameplay camera.
 - The camera is rounded to integer pixels for this Zen prototype.
@@ -23,11 +26,13 @@ stacking physics. The prototype covers only the starting 720 x 1280 section.
   the flow instead of moving the whole sprite rectangle.
 - Mist is a low-opacity procedural band with slow horizontal noise drift.
 - The clean plate never changes exposure or geometry.
+- The gorge plate overlaps the start by 96 pixels and fades at its lower edge,
+  hiding the boundary while the camera climbs.
 
 ## Current scope and limitations
 
-- Only the starting section is complete. The world above it still needs
-  separate garden, monastery, mountain, cloud, and sky sections.
+- The start and monastery-gorge sections are complete. The world above still
+  needs separate mountain, cloud, and sky sections.
 - The generated sakura and waterfall need final art-direction approval before
   they become the style contract for the remaining sections.
 - Stones and pedestal were deliberately left unchanged for this prototype.
@@ -42,6 +47,5 @@ stacking physics. The prototype covers only the starting 720 x 1280 section.
 
 ## Next checkpoint
 
-Approve or reject the visual language and motion of the starting section. If
-approved, replace the temporary branch and waterfall with final art and build
-the second vertical world section using the same layer contract.
+Review the monastery-gorge section in the live camera climb. Continue with the
+mountain and cloud sections after its composition and motion are approved.

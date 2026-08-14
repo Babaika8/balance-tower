@@ -18,3 +18,12 @@
 - Recorded a seven-second 720 x 1280 animation review and completed a Web export.
 - Deployed the prototype to GitHub Pages for immediate Telegram testing.
 - The next decision is visual approval before extending the world upward.
+
+## 2026-08-14 — Zen monastery-gorge extension
+
+- Extended the layered Zen route upward with a second 720 x 1280 authored
+  section containing cliff monasteries, distant peaks, bamboo, and open mist.
+- Added a separate animated waterfall and a drifting mist band.
+- Joined the two plates with a 96-pixel overlap and lower-edge fade.
+- Removed an independent pine overlay after visual QA exposed a color fringe.
+- Verified both the upper composition and the transition during camera climb.

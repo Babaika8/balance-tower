@@ -7,6 +7,8 @@ const START_CAMERA_Y := 820.0
 const BACKGROUND := preload("res://assets/skins/zen/prototype/start_clean.png")
 const SAKURA := preload("res://assets/skins/zen/prototype/sakura_branch.png")
 const WATERFALL := preload("res://assets/skins/zen/prototype/waterfall.png")
+const GORGE_BACKGROUND := preload("res://assets/skins/zen/prototype/gorge_clean.png")
+const GORGE_WATERFALL := preload("res://assets/skins/zen/prototype/gorge_waterfall.png")
 
 var _wind_strength := 0.0
 var _wind_target := 0.0
@@ -16,6 +18,7 @@ var _sakura_material: ShaderMaterial
 var _waterfall_material: ShaderMaterial
 var _mist_material: ShaderMaterial
 var _background: Sprite2D
+var _gorge_background: Sprite2D
 
 
 func _ready() -> void:
@@ -23,12 +26,15 @@ func _ready() -> void:
 	_build_mist()
 	_build_waterfall()
 	_build_sakura()
+	_build_gorge_waterfall()
 	_next_gust_at = Time.get_ticks_msec() / 1000.0 + 1.5
 
 
 func _process(delta: float) -> void:
 	var viewport_width := get_viewport().get_visible_rect().size.x
-	_background.scale = Vector2.ONE * maxf(1.0, viewport_width / BASE_W)
+	var section_scale := maxf(1.0, viewport_width / BASE_W)
+	_background.scale = Vector2.ONE * section_scale
+	_gorge_background.scale = Vector2.ONE * section_scale
 	var now := Time.get_ticks_msec() / 1000.0
 	if now >= _next_gust_at:
 		_wind_target = randf_range(0.55, 1.0) if _wind_target < 0.1 else 0.0
@@ -44,6 +50,26 @@ func _build_background() -> void:
 	_background.position = Vector2(BASE_W * 0.5, START_CAMERA_Y)
 	_background.z_index = -100
 	add_child(_background)
+
+	var seam_shader := Shader.new()
+	seam_shader.code = """
+shader_type canvas_item;
+
+void fragment() {
+	vec4 tex = texture(TEXTURE, UV);
+	float bottom_fade = 1.0 - smoothstep(0.94, 1.0, UV.y);
+	COLOR = vec4(tex.rgb, tex.a * bottom_fade);
+}
+"""
+	var seam_material := ShaderMaterial.new()
+	seam_material.shader = seam_shader
+	_gorge_background = Sprite2D.new()
+	_gorge_background.texture = GORGE_BACKGROUND
+	_gorge_background.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_gorge_background.material = seam_material
+	_gorge_background.position = Vector2(BASE_W * 0.5, -364.0)
+	_gorge_background.z_index = -99
+	add_child(_gorge_background)
 
 
 func _build_sakura() -> void:
@@ -135,6 +161,35 @@ void fragment() {
 	add_child(waterfall)
 
 
+func _build_gorge_waterfall() -> void:
+	var shader := Shader.new()
+	shader.code = """
+shader_type canvas_item;
+
+void fragment() {
+	vec2 uv = UV;
+	float edge = smoothstep(0.0, 0.10, uv.x) * smoothstep(1.0, 0.90, uv.x);
+	float fast_flow = sin(uv.y * 118.0 - TIME * 10.0 + sin(uv.x * 15.0) * 2.0);
+	float slow_flow = sin(uv.y * 37.0 - TIME * 4.2);
+	float drift = (fast_flow * 0.0018 + slow_flow * 0.0012) * edge;
+	vec4 tex = texture(TEXTURE, vec2(clamp(uv.x + drift, 0.0, 1.0), uv.y));
+	float moving_light = (0.5 + 0.5 * fast_flow) * edge * tex.a;
+	COLOR = vec4(tex.rgb + vec3(0.055, 0.075, 0.095) * moving_light, tex.a);
+}
+"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	var waterfall := Sprite2D.new()
+	waterfall.texture = GORGE_WATERFALL
+	waterfall.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	waterfall.material = material
+	waterfall.position = Vector2(164.0, -500.0)
+	waterfall.scale = Vector2(0.072, 0.35)
+	waterfall.modulate = Color(0.55, 0.65, 0.72, 0.46)
+	waterfall.z_index = -86
+	add_child(waterfall)
+
+
 func _build_mist() -> void:
 	var shader := Shader.new()
 	shader.code = """
@@ -176,3 +231,11 @@ void fragment() {
 	mist.position = Vector2(BASE_W * 0.5, 350.0)
 	mist.z_index = -90
 	add_child(mist)
+
+	var gorge_mist := Polygon2D.new()
+	gorge_mist.polygon = mist.polygon
+	gorge_mist.uv = mist.uv
+	gorge_mist.material = _mist_material
+	gorge_mist.position = Vector2(BASE_W * 0.5, -410.0)
+	gorge_mist.z_index = -90
+	add_child(gorge_mist)
