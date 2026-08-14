@@ -215,6 +215,7 @@ func _auto_shot() -> void:
 const SCENE_SCALE := 1.08
 const NEAR_SCALE := 0.62
 const ZEN_PIXEL_BG := true   # Дзен: цельный пиксель-арт задник вместо векторной сцены
+const ZEN_START_PROTOTYPE := true
 const FAR_ART_W := 2400.0   # ширина канваса дальнего слоя (для неба над ним)
 
 func _setup_background() -> void:
@@ -223,6 +224,11 @@ func _setup_background() -> void:
 		return
 	if skin == 2:
 		_setup_airport()
+		return
+	if ZEN_START_PROTOTYPE:
+		var prototype := preload("res://zen_start_prototype.tscn").instantiate()
+		add_child(prototype)
+		RenderingServer.set_default_clear_color(Color("17212B"))
 		return
 	# Оригинальная сцена (EPS-референс) как фон. Режим COVER сам адаптирует под любой
 	# экран: на узком/портретном сужается по бокам, на широком показывает целиком.
@@ -1637,6 +1643,8 @@ func _process(delta: float) -> void:
 	if camera:
 		var target_y := top_y - 150.0
 		camera.position.y = lerp(camera.position.y, target_y, clamp(delta * 3.0, 0.0, 1.0))
+		if skin == 0 and ZEN_START_PROTOTYPE:
+			camera.position.y = roundf(camera.position.y)
 	_update_parallax()
 	_update_atmosphere()
 	_update_zen_life()

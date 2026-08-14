@@ -30,3 +30,8 @@ Everything is built in code; one scene.
 
 ## Live
 https://babaika8.github.io/balance-tower/
+
+## Visual development
+
+- `zen-layered-background.md` — isolated layered Zen prototype, animation
+  contract, verification, and current limitations.
