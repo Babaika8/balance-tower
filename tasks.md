@@ -1,11 +1,11 @@
 # Tasks — balance-tower
 
 ## Now
-- Review the live monastery-gorge section during the vertical camera climb.
+- Review the new painted Zen diorama in the live Telegram build.
 
 ## Next
-- Approve or revise the gorge composition and waterfall motion.
-- Build the mountain and cloud sections above the gorge.
+- Decide whether the painted diorama becomes the new Zen art direction.
+- If approved, redraw the stones and UI to match its non-pixel style.
 
 ## Done (as of 2026-06)
 - Core physics stacking engine, single-scene architecture.

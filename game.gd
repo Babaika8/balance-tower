@@ -226,7 +226,7 @@ func _setup_background() -> void:
 		_setup_airport()
 		return
 	if ZEN_START_PROTOTYPE:
-		var prototype := preload("res://zen_start_prototype.tscn").instantiate()
+		var prototype := preload("res://zen_diorama.tscn").instantiate()
 		add_child(prototype)
 		RenderingServer.set_default_clear_color(Color("17212B"))
 		return
@@ -1554,7 +1554,9 @@ func _setup_pedestal() -> void:
 	if not ped_tex and skin == 0:
 		ped_tex = _skin_tex("pedestal.png")
 	var stones_arr: Array = theme.get("stones", [])
-	if ped_tex:
+	if skin == 0 and ZEN_START_PROTOTYPE:
+		pass
+	elif ped_tex:
 		var ped_sp := _sprite_scaled_to_width(ped_tex, ssize.x * 1.34)
 		ped_sp.position.y = -8.0
 		ped.add_child(ped_sp)

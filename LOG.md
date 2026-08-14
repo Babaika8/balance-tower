@@ -27,3 +27,15 @@
 - Joined the two plates with a 96-pixel overlap and lower-edge fade.
 - Removed an independent pine overlay after visual QA exposed a color fringe.
 - Verified both the upper composition and the transition during camera climb.
+
+## 2026-08-14 — Painted Zen diorama experiment
+
+- Replaced the active pixel-art prototype with an original hand-painted
+  theatrical diorama while retaining the existing stacking physics.
+- Added a valley start plate, an authored transparent foreground with integrated
+  terrace, and an upper cloud-temple plate.
+- Hid only the old Zen pedestal sprite; its collision and tower coordinates are
+  unchanged.
+- Added restrained foreground deformation and short drifting petal movement.
+- Verified the start, first placed stone, upper camera position, and section
+  transition in native Godot.

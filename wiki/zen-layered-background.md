@@ -1,5 +1,8 @@
 # Zen layered background prototype
 
+> Superseded on 2026-08-14 by `zen_diorama.tscn`. The files remain available
+> for comparison and rollback.
+
 ## Goal
 
 Prove the production approach for a living Zen background without changing the
