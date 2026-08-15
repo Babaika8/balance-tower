@@ -39,3 +39,14 @@
 - Added restrained foreground deformation and short drifting petal movement.
 - Verified the start, first placed stone, upper camera position, and section
   transition in native Godot.
+
+## 2026-08-15 — Four-plane Zen parallax demonstration
+
+- Rebuilt the active painted diorama around four independent `Parallax2D`
+  planes instead of manual camera compensation.
+- Added authored far and mid plates derived from one visual composition.
+- Kept the existing foreground terrace as a separate near plane and moved
+  petals into an atmosphere plane.
+- Tuned vertical depth for a climbing game and added a 128-pixel upper-section
+  overlap.
+- Verified start, mid-climb, and upper-section camera positions in Godot.

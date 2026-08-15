@@ -1,10 +1,10 @@
 # Tasks — balance-tower
 
 ## Now
-- Review the new painted Zen diorama in the live Telegram build.
+- Review the four-plane Zen parallax demonstration in the live Telegram build.
 
 ## Next
-- Decide whether the painted diorama becomes the new Zen art direction.
+- Decide whether the painted parallax becomes the new Zen art direction.
 - If approved, redraw the stones and UI to match its non-pixel style.
 
 ## Done (as of 2026-06)

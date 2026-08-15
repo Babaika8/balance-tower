@@ -1,71 +1,85 @@
 extends Node2D
 
 const BASE_W := 720.0
-const START_CAMERA_Y := 820.0
-const LOWER_CENTER := Vector2(360.0, 540.0)
-const UPPER_CENTER := Vector2(360.0, -548.0)
-const FOREGROUND_CENTER := Vector2(360.0, 490.0)
+const FAR_LOWER_CENTER := Vector2(360.0, 409.0)
+const FAR_UPPER_CENTER := Vector2(360.0, -743.0)
+const MID_CENTER := Vector2(360.0, 458.0)
+const NEAR_CENTER := Vector2(360.0, 457.0)
+const ATMOSPHERE_CENTER := Vector2(360.0, 432.0)
 
-const VALLEY := preload("res://assets/skins/zen/diorama/valley_base.png")
+const FAR := preload("res://assets/skins/zen/diorama/valley_far.png")
+const MID := preload("res://assets/skins/zen/diorama/valley_mid.png")
 const SKY_TEMPLE := preload("res://assets/skins/zen/diorama/sky_temple.png")
-const FOREGROUND := preload("res://assets/skins/zen/diorama/valley_foreground.png")
+const NEAR := preload("res://assets/skins/zen/diorama/valley_foreground.png")
 
-var _plates: Array[Sprite2D] = []
-var _foreground: MeshInstance2D
+var _scalable: Array[CanvasItem] = []
 
 
 func _ready() -> void:
-	_build_world_plates()
-	_build_foreground()
-	_build_petals()
+	var far_world := _parallax("FarWorld", Vector2(0.08, 0.84), -100)
+	_build_far(far_world)
+
+	var mid_world := _parallax("MidWorld", Vector2(0.18, 0.90), -90)
+	_build_mid(mid_world)
+
+	var near_world := _parallax("NearWorld", Vector2(0.38, 0.96), -80)
+	_build_near(near_world)
+
+	var atmosphere := _parallax("Atmosphere", Vector2(0.24, 0.88), -70)
+	_build_atmosphere(atmosphere)
 
 
 func _process(_delta: float) -> void:
 	var viewport_width := get_viewport().get_visible_rect().size.x
 	var cover_scale := maxf(1.0, viewport_width / BASE_W)
-	for plate in _plates:
-		plate.scale = Vector2.ONE * cover_scale
-	_foreground.scale = Vector2.ONE * cover_scale
-
-	var camera := get_viewport().get_camera_2d()
-	if camera:
-		var climb := camera.position.y - START_CAMERA_Y
-		_foreground.position.y = FOREGROUND_CENTER.y - climb * 0.025
-		var ascent := START_CAMERA_Y - camera.position.y
-		_foreground.modulate.a = 1.0 - smoothstep(420.0, 760.0, ascent)
+	for item in _scalable:
+		item.scale = Vector2.ONE * cover_scale
 
 
-func _build_world_plates() -> void:
-	var valley := Sprite2D.new()
-	valley.texture = VALLEY
-	valley.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	valley.position = LOWER_CENTER
-	valley.z_index = -100
-	add_child(valley)
-	_plates.append(valley)
+func _parallax(node_name: String, depth: Vector2, z: int) -> Parallax2D:
+	var layer := Parallax2D.new()
+	layer.name = node_name
+	layer.scroll_scale = depth
+	layer.repeat_size = Vector2.ZERO
+	layer.repeat_times = 1
+	layer.follow_viewport = true
+	layer.ignore_camera_scroll = false
+	layer.limit_begin = Vector2(-100000.0, -5420.0)
+	layer.limit_end = Vector2(100000.0, 1460.0)
+	layer.z_index = z
+	add_child(layer)
+	return layer
+
+
+func _build_far(parent: Node) -> void:
+	var lower := _sprite(FAR, FAR_LOWER_CENTER)
+	parent.add_child(lower)
+	_scalable.append(lower)
 
 	var seam_shader := Shader.new()
 	seam_shader.code = """
 shader_type canvas_item;
 void fragment() {
 	vec4 tex = texture(TEXTURE, UV);
-	float fade = 1.0 - smoothstep(0.84, 1.0, UV.y);
+	float fade = 1.0 - smoothstep(0.94, 1.0, UV.y);
 	COLOR = vec4(tex.rgb, tex.a * fade);
 }
 """
 	var seam_material := ShaderMaterial.new()
 	seam_material.shader = seam_shader
-	var sky := Sprite2D.new()
-	sky.texture = SKY_TEMPLE
-	sky.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sky.material = seam_material
-	sky.position = UPPER_CENTER
-	sky.z_index = -99
-	add_child(sky)
-	_plates.append(sky)
+	var upper := _sprite(SKY_TEMPLE, FAR_UPPER_CENTER)
+	upper.material = seam_material
+	parent.add_child(upper)
+	_scalable.append(upper)
 
 
-func _build_foreground() -> void:
+func _build_mid(parent: Node) -> void:
+	var mid := _sprite(MID, MID_CENTER)
+	parent.add_child(mid)
+	_scalable.append(mid)
+
+
+func _build_near(parent: Node) -> void:
 	var shader := Shader.new()
 	shader.code = """
 shader_type canvas_item;
@@ -83,19 +97,19 @@ void fragment() {
 """
 	var material := ShaderMaterial.new()
 	material.shader = shader
-	material.set_shader_parameter("art", FOREGROUND)
-	_foreground = MeshInstance2D.new()
-	_foreground.mesh = _grid_mesh(FOREGROUND, 18, 24)
-	_foreground.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_foreground.material = material
-	_foreground.position = FOREGROUND_CENTER
-	_foreground.z_index = -72
-	add_child(_foreground)
+	material.set_shader_parameter("art", NEAR)
+	var near := MeshInstance2D.new()
+	near.mesh = _grid_mesh(NEAR, 18, 24)
+	near.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	near.material = material
+	near.position = NEAR_CENTER
+	parent.add_child(near)
+	_scalable.append(near)
 
 
-func _build_petals() -> void:
+func _build_atmosphere(parent: Node) -> void:
 	var petals := CPUParticles2D.new()
-	petals.position = Vector2(360.0, 350.0)
+	petals.position = ATMOSPHERE_CENTER
 	petals.amount = 18
 	petals.lifetime = 7.0
 	petals.randomness = 0.8
@@ -107,8 +121,15 @@ func _build_petals() -> void:
 	petals.scale_amount_min = 1.6
 	petals.scale_amount_max = 3.2
 	petals.color = Color(1.0, 0.62, 0.72, 0.72)
-	petals.z_index = -68
-	add_child(petals)
+	parent.add_child(petals)
+
+
+func _sprite(texture: Texture2D, at: Vector2) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.position = at
+	return sprite
 
 
 func _grid_mesh(texture: Texture2D, cols: int, rows: int) -> ArrayMesh:

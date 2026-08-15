@@ -3,6 +3,23 @@
 > Superseded on 2026-08-14 by `zen_diorama.tscn`. The files remain available
 > for comparison and rollback.
 
+## Four-plane parallax demonstration
+
+The active `zen_diorama.gd` now uses four independent `Parallax2D` nodes:
+
+- `FarWorld`: distant sky, mountains, and the upper cloud-temple section;
+- `MidWorld`: cliffs, shrines, stairs, bridge, and river banks;
+- `NearWorld`: the authored cherry-tree and terrace theatre-flat;
+- `Atmosphere`: drifting petals.
+
+Vertical scroll values are deliberately close together (`0.84`, `0.90`,
+`0.96`, `0.88`). Horizontal platformer values such as `0.2` would prevent a
+vertical narrative background from advancing with the climbing camera.
+
+The far section transition uses 128 pixels of physical overlap. Story panels
+do not repeat; only future seamless cloud or mist textures may use
+`Parallax2D.repeat_size`.
+
 ## Goal
 
 Prove the production approach for a living Zen background without changing the

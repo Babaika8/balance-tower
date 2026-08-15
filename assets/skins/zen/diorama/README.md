@@ -21,5 +21,10 @@ terrace. It was generated on magenta chroma key and cleaned locally.
 `sky_temple.png` continues the valley upward into a cloud shrine with side
 temples, streamers, waterfalls, and kites while preserving the open center.
 
+`valley_far.png` and `valley_mid.png` are the authored demonstration split of
+the same valley composition. The active scene places far, mid, near, and
+atmosphere content in separate `Parallax2D` nodes with vertical depth values
+chosen for a climbing camera rather than a horizontal platformer.
+
 The physical pedestal remains unchanged. Its old sprite is hidden only for this
 visual experiment because the painted terrace now supplies the visible base.
