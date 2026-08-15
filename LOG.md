@@ -1,5 +1,14 @@
 # Log — balance-tower
 
+## 2026-08-15 — Complete vertical Zen world
+
+- Rebuilt the start around the authored valley, bridge, water, and terrace.
+- Extended the route through high mountains, open sky, and evening zenith.
+- Added local cloud, water, canopy, and petal motion to the parallax system.
+- Replaced hard image joins with broad mist transitions.
+- Verified the start, five physical drops, mid-climb, and `BT_CLIMB=5200`.
+- Kept stacking physics and shared game mechanics unchanged.
+
 ## 2026-06-22
 - Added BOOTSTRAP knowledge docs (CLAUDE.md, spec, tasks, wiki, LOG) and populated
   spec/wiki from the actual code, so laptop + VPS Telegram agent share one source

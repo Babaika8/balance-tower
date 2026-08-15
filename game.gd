@@ -228,7 +228,9 @@ func _setup_background() -> void:
 	if ZEN_START_PROTOTYPE:
 		var prototype := preload("res://zen_diorama.tscn").instantiate()
 		add_child(prototype)
-		RenderingServer.set_default_clear_color(Color("17212B"))
+		# The final authored plate opens into blue sky. Matching the clear color
+		# keeps very tall towers from revealing a dark technical void above it.
+		RenderingServer.set_default_clear_color(Color("172B62"))
 		return
 	# Оригинальная сцена (EPS-референс) как фон. Режим COVER сам адаптирует под любой
 	# экран: на узком/портретном сужается по бокам, на широком показывает целиком.

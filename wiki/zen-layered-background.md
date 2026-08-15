@@ -12,6 +12,11 @@ The active `zen_diorama.gd` now uses four independent `Parallax2D` nodes:
 - `NearWorld`: the authored cherry-tree and terrace theatre-flat;
 - `Atmosphere`: drifting petals.
 
+The vertical story is complete across five authored chapters: garden valley,
+cloud temples, high mountains, open sky, and evening zenith. The joins overlap
+inside broad mist banks. At the maximum tested climb (`BT_CLIMB=5200`) authored
+art still covers the full viewport.
+
 Vertical scroll values are deliberately close together (`0.84`, `0.90`,
 `0.96`, `0.88`). Horizontal platformer values such as `0.2` would prevent a
 vertical narrative background from advancing with the climbing camera.
@@ -49,13 +54,12 @@ sections of the vertical route.
 - The gorge plate overlaps the start by 96 pixels and fades at its lower edge,
   hiding the boundary while the camera climbs.
 
-## Current scope and limitations
+## Current scope
 
-- The start and monastery-gorge sections are complete. The world above still
-  needs separate mountain, cloud, and sky sections.
-- The generated sakura and waterfall need final art-direction approval before
-  they become the style contract for the remaining sections.
-- Stones and pedestal were deliberately left unchanged for this prototype.
+- The full vertical camera route is covered through approximately 100 stones.
+- Stones and shared stacking physics remain unchanged.
+- The painted terrace supplies the visible base while the physical pedestal
+  remains the collision surface.
 
 ## Verification
 

@@ -1,11 +1,10 @@
 # Tasks — balance-tower
 
 ## Now
-- Review the four-plane Zen parallax demonstration in the live Telegram build.
+- Review the complete vertical Zen world in the live Telegram build.
 
 ## Next
-- Decide whether the painted parallax becomes the new Zen art direction.
-- If approved, redraw the stones and UI to match its non-pixel style.
+- Tune individual authored motions after live-device review.
 
 ## Done (as of 2026-06)
 - Core physics stacking engine, single-scene architecture.
@@ -15,3 +14,4 @@
 - Layered Zen starting-section prototype with independent sakura, waterfall,
   and mist animation; native movie capture and Web export verified.
 - Second monastery-gorge section with an animated waterfall and mist layer.
+- Full five-chapter Zen route through the 100-stone camera range.

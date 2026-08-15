@@ -26,5 +26,14 @@ the same valley composition. The active scene places far, mid, near, and
 atmosphere content in separate `Parallax2D` nodes with vertical depth values
 chosen for a climbing camera rather than a horizontal platformer.
 
+The complete climb adds `high_mountains.png`, `high_sky.png`, and `zenith.png`.
+Together with `valley_base.png` and `sky_temple.png`, these authored chapters
+cover the full route from the terrace to roughly one hundred stones. Broad mist
+banks conceal the chapter joins without repeating story panels.
+
+Clouds drift through a restrained luminance mask, cyan water flows locally,
+the foreground canopy bends on a grid mesh while the terrace stays fixed, and
+petals remain on a separate atmosphere plane.
+
 The physical pedestal remains unchanged. Its old sprite is hidden only for this
 visual experiment because the painted terrace now supplies the visible base.
