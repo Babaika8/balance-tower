@@ -121,3 +121,20 @@ verdict, and consequence. Read this file before any substantial project work.
   geometry alone is not an acceptable art pipeline. Do not deploy this test.
   Continuing this direction requires authored models, silhouettes, textures,
   lighting, and composition rather than adding more motion to the blockout.
+
+## Checkpoint 9 — Full-height Blender Zen integration
+
+- Goal: turn the accepted Blender direction into a playable Zen background
+  while preserving the existing stacking mechanics and camera behavior.
+- Method: extended one continuous 2.5D world through valley, monastery, clouds,
+  gates, kites, and night sky; exported it as GLB; rendered it through a Godot
+  `SubViewport`; linked the 3D camera to the existing 2D camera climb.
+- Result: the Godot scene now renders the Blender world behind live stones.
+  Blender exports all environmental motion as one scene timeline, including
+  articulated sakura, clouds, lantern, kites, petals, river foam, and waterfall
+  streams. Start, five-drop gameplay, multiple climb heights, and motion between
+  timed screenshots were checked locally.
+- User verdict: pending live Telegram review.
+- Consequence: this is the first deployable object-animation baseline. It does
+  not modify stone physics. Further art passes should replace or refine actual
+  Blender objects instead of returning to sliced PNG overlays or distortion.

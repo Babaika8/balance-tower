@@ -119,3 +119,16 @@
 - Tuned vertical depth for a climbing game and added a 128-pixel upper-section
   overlap.
 - Verified start, mid-climb, and upper-section camera positions in Godot.
+
+## 2026-08-16 — Playable Blender Zen world
+
+- Replaced the active Zen background renderer with a continuous Blender 2.5D
+  world displayed through a Godot `SubViewport`.
+- Connected the existing vertical gameplay camera to the Blender world without
+  changing stone physics or drop coordinates.
+- Merged environmental object motion into one glTF scene timeline so Godot can
+  animate branches, blossoms, clouds, lanterns, kites, petals, and water.
+- Rebuilt the river as a perspective plane and animated foam geometry because
+  glTF does not preserve Blender procedural material animation.
+- Verified start framing, five automatic drops, camera climb, and timed motion
+  differences in native Godot before Web export.
