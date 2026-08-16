@@ -138,3 +138,23 @@ verdict, and consequence. Read this file before any substantial project work.
 - Consequence: this is the first deployable object-animation baseline. It does
   not modify stone physics. Further art passes should replace or refine actual
   Blender objects instead of returning to sliced PNG overlays or distortion.
+
+## Checkpoint 10 — Saturated anime 16-bit Zen rebuild
+
+- Goal: replace the rejected low-poly Blender art with one coherent Japanese
+  anime 16-bit visual language shared by the world, foundation, and stones.
+- Method: approved one complete art-direction frame, authored five continuous
+  vertical chapters at a logical `360 x 640` pixel grid, normalized them to
+  exact `2x` nearest-neighbor output, and rebuilt eight stone sprites around
+  the unchanged `180 x 56` physics contract.
+- Result: the active Zen renderer now presents a dense village, shrine street,
+  mountain monastery, cloud sunset, and night zenith. The illustrated shrine
+  platform is aligned with the physical foundation at `y = 970`; stone artwork
+  uses identical top and bottom contact lines without per-sprite stretch hacks.
+  Start, five drops, and climb positions `1200`, `2800`, and `4800` were checked
+  in native Godot.
+- User verdict: the art-direction target was approved; live build review is
+  pending.
+- Consequence: this becomes the new visual baseline. Environmental animation
+  must be authored against these pixel layers and may not revive the rejected
+  low-poly Blender blockout or generic distortion filters.

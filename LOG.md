@@ -132,3 +132,15 @@
   glTF does not preserve Blender procedural material animation.
 - Verified start framing, five automatic drops, camera climb, and timed motion
   differences in native Godot before Web export.
+
+## 2026-08-16 — Anime 16-bit Zen visual rebuild
+
+- Replaced the active low-poly Blender background with five saturated Japanese
+  anime pixel-art chapters covering the full tested camera climb.
+- Standardized every chapter through a `360 x 640` logical grid and exact `2x`
+  nearest-neighbor output.
+- Added eight matching opaque stone sprites with exact `180 x 56` canvases and
+  removed the old per-texture vertical stretching and offsets.
+- Aligned the illustrated shrine platform with the unchanged physical base.
+- Added pixel-fog overlap between chapters and verified three upper climb
+  positions plus a five-stone gameplay stack.

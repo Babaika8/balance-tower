@@ -3719,14 +3719,14 @@ func _zen_stone_texs_get() -> Array:
 	if not _zen_stone_texs_loaded:
 		_zen_stone_texs_loaded = true
 		for p in [
-				"stone2.png",
-				"stone4.png",
-				"stone5.png",
-				"stone7.png",
-				"stone8.png",
-				"stone10.png",
-				"stone11.png",
-				"stone12.png"]:
+				"v2/stone_1.png",
+				"v2/stone_2.png",
+				"v2/stone_3.png",
+				"v2/stone_4.png",
+				"v2/stone_5.png",
+				"v2/stone_6.png",
+				"v2/stone_7.png",
+				"v2/stone_8.png"]:
 			var tex := _skin_tex(p)
 			if tex:
 				_zen_stone_texs.append(tex)
@@ -3742,9 +3742,7 @@ func _make_zen_stone(size: Vector2, idx: int) -> Node2D:
 		var spr := Sprite2D.new()
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var visual_h: float = [1.58, 1.62, 1.64, 1.66, 1.62, 1.64, 1.60, 1.62, 1.65, 1.64, 1.66, 1.63][ti % 12]
-		spr.scale = Vector2(size.x / float(tex.get_width()), size.y * visual_h / float(tex.get_height()))
-		spr.position.y = float([17.0, 17.0, 17.0, 18.0, 17.0, 17.0, 16.0, 17.0, 17.0, 17.0, 18.0, 17.0][ti % 12])
+		spr.scale = Vector2(size.x / float(tex.get_width()), size.y / float(tex.get_height()))
 		nt.add_child(spr)
 		return nt
 	var t: int = (idx if idx >= 0 else 0) % 3
