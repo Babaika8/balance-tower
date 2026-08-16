@@ -1,5 +1,15 @@
 # Log — balance-tower
 
+## 2026-08-16 — Blender 2.5D technical prototype
+
+- Installed Blender 5.2.0 and created a reproducible Zen diorama script under
+  `tools/blender/zen_diorama_prototype.py`.
+- Rendered an eight-second 360 x 640, 30 FPS object-animation test.
+- Confirmed that branches, blossoms, lantern, water, clouds, petals, and camera
+  can move as connected scene objects rather than image overlays.
+- Visual review found the procedural geometry too crude for production quality.
+- Kept the result out of the active game and did not deploy it.
+
 ## 2026-08-16 — Restored key-point project journal
 
 - Added `PROJECT_JOURNAL.md` in the format originally required by the user:

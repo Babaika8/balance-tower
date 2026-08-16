@@ -103,3 +103,21 @@ verdict, and consequence. Read this file before any substantial project work.
   implemented, approved, or rejected.
 - No new implementation may begin until its smallest complete test, toolchain,
   performance target, and rollback boundary are written here.
+
+## Checkpoint 8 — First Blender 2.5D diorama test
+
+- Goal: test a materially different production environment where environmental
+  elements are real scene objects instead of extracted parts of a flat image.
+- Method: installed Blender 5.2.0; created an orthographic 3D Zen diorama with
+  separate cliffs, shrine, articulated sakura branches, attached blossoms,
+  hanging lantern, animated water material, moving cloud groups, petals, and a
+  vertically animated camera. Rendered 240 frames at 30 FPS.
+- Result: object attachment and continuous movement work as intended. The test
+  no longer depends on screen-space warps or randomly switched PNG overlays.
+  However, programmatically assembled primitives look like a rough blockout,
+  not finished Rayman-quality environment art.
+- User verdict: pending review of `art_review/blender_zen/zen_diorama.mp4`.
+- Consequence: Blender is technically viable for coherent motion, but procedural
+  geometry alone is not an acceptable art pipeline. Do not deploy this test.
+  Continuing this direction requires authored models, silhouettes, textures,
+  lighting, and composition rather than adding more motion to the blockout.
