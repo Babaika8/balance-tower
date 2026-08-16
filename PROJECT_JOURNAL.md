@@ -193,3 +193,17 @@ verdict, and consequence. Read this file before any substantial project work.
 - Visual status: the included GLB is the previously rejected low-poly technical
   blockout. It validates the new runtime architecture, not the final art target.
   Production work now belongs in the Blender scene rather than Godot overlays.
+
+## Checkpoint 13 — Approved art over the WebGL motion rig
+
+- Goal: retain the accepted Three.js/Rapier motion while removing the rejected
+  low-poly visual language.
+- Method: preserved Blender animation roots for branches, clouds, kites,
+  lanterns, petals, and waterfalls; hid non-animated blockout scenery; placed
+  the five approved saturated 16-bit Zen chapters as the continuous world art.
+- Alignment: moved only the art by 205 logical pixels so the illustrated
+  foundation meets the unchanged Rapier contact line. The separate visual
+  pedestal was removed while its fixed physics collider remains.
+- Result: the first dropped stone visibly contacts the illustrated foundation,
+  score increments, and the existing WebGL movement and tower physics continue
+  without browser errors.

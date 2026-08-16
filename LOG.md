@@ -163,3 +163,12 @@
   drop impulse, contacts, collapse checks, score, camera climb, and three boosts.
 - Added Telegram Mini App initialization and browser-local coin persistence.
 - Kept the current live build intact and prepared isolated `/next/` deployment.
+
+## 2026-08-16 — WebGL art-direction replacement
+
+- Replaced the visible low-poly scenery in `/next/` with the approved five-part
+  saturated 16-bit Zen world.
+- Retained Blender-authored animated transforms for environmental motion.
+- Removed the duplicate 3D pedestal visual and aligned the illustrated
+  foundation to the unchanged Rapier collider.
+- Verified the first stone contact, score update, and error-free browser frame.

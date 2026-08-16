@@ -14,6 +14,7 @@ const DROP_PUSH = 260;
 const MARGIN = 90;
 const SCALE = 10.4 / H;
 const START_SCENE_Y = 5.1;
+const ART_Y_OFFSET = 205 * SCALE;
 
 const canvas = document.querySelector('#world');
 const scoreEl = document.querySelector('#score');
@@ -49,7 +50,7 @@ const textures = [];
 await RAPIER.init();
 setupRenderer();
 setupPhysics();
-await Promise.all([loadBlenderWorld(), loadStoneTextures()]);
+await Promise.all([loadBackdrop(), loadBlenderWorld(), loadStoneTextures()]);
 setupPedestal();
 spawnCarrier();
 state = 'waiting';
@@ -68,7 +69,7 @@ function setupRenderer() {
   renderer.toneMappingExposure = 0.62;
 
   scene = new THREE.Scene();
-  scene.background = new THREE.Color('#6faeb4');
+  scene.background = new THREE.Color('#102a26');
   camera = new THREE.OrthographicCamera(-2.925, 2.925, 5.2, -5.2, 0.1, 80);
   camera.position.set(0, START_SCENE_Y, 18.5);
   camera.lookAt(0, START_SCENE_Y - 0.35, 0);
@@ -99,12 +100,35 @@ function setupPhysics() {
 
 async function loadBlenderWorld() {
   const gltf = await new GLTFLoader().loadAsync('./assets/zen_world.glb');
+  const animatedRoots = [];
+  const animatedPrefixes = [
+    'Branch pivot', 'Cloud group', 'Kite ', 'Lantern attachment', 'Petal ',
+    'Upper cloud bank', 'Waterfall stream'
+  ];
+  gltf.scene.traverse((node) => {
+    if (animatedPrefixes.some((prefix) => node.name.startsWith(prefix))) animatedRoots.push(node);
+  });
+  const animatedNodes = new Set();
+  animatedRoots.forEach((root) => root.traverse((node) => animatedNodes.add(node)));
   gltf.scene.traverse((node) => {
     if (node.isLight || node.isCamera) {
       node.visible = false;
       return;
     }
     if (!node.isMesh) return;
+    if (!animatedNodes.has(node)) {
+      node.visible = false;
+      return;
+    }
+    if (node.material) {
+      const source = Array.isArray(node.material) ? node.material[0] : node.material;
+      node.material = new THREE.MeshToonMaterial({
+        color: source.color?.clone() ?? new THREE.Color(0xffffff),
+        transparent: source.transparent,
+        opacity: source.opacity,
+        side: THREE.DoubleSide
+      });
+    }
     node.castShadow = true;
     node.receiveShadow = true;
     if (node.material) node.material.shadowSide = THREE.FrontSide;
@@ -113,6 +137,22 @@ async function loadBlenderWorld() {
   if (gltf.animations.length) {
     mixer = new THREE.AnimationMixer(gltf.scene);
     gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+  }
+}
+
+async function loadBackdrop() {
+  const loader = new THREE.TextureLoader();
+  for (let i = 0; i < 5; i++) {
+    const texture = await loader.loadAsync(`./assets/chapter_${i}.png`);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.LinearMipmapLinearFilter;
+    const plane = new THREE.Mesh(
+      new THREE.PlaneGeometry(5.85, 10.4),
+      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+    );
+    plane.position.set(0, START_SCENE_Y + ART_Y_OFFSET + i * 10.4, -6);
+    scene.add(plane);
   }
 }
 
@@ -128,14 +168,8 @@ async function loadStoneTextures() {
 }
 
 function setupPedestal() {
-  const geometry = new THREE.BoxGeometry(STONE_W * SCALE * 1.15, 60 * SCALE, 0.42);
-  const material = new THREE.MeshStandardMaterial({ color: 0x425a39, roughness: 0.88 });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.position.copy(screenToWorld(W / 2, 1000));
-  mesh.position.z = 10.9;
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
-  scene.add(mesh);
+  // The approved background already contains the foundation. Rapier keeps the
+  // independent fixed collider, but no second visual platform is drawn here.
 }
 
 function spawnCarrier() {
