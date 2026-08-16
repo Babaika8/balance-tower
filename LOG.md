@@ -144,3 +144,13 @@
 - Aligned the illustrated shrine platform with the unchanged physical base.
 - Added pixel-fog overlap between chapters and verified three upper climb
   positions plus a five-stone gameplay stack.
+
+## 2026-08-16 — Living chapter-zero object pass
+
+- Rebuilt the start chapter as a clean base plate with scenery restored behind
+  every moving object.
+- Added authored six-frame sakura and banner cycles and an eight-frame water
+  cycle instead of shaders or sliced-background movement.
+- Added whole-object cloud drift, lantern interior pulses, and independent
+  pixel-petal paths with fixed attachment and layering rules.
+- Verified visible time-based motion and a five-stone stack in native Godot.

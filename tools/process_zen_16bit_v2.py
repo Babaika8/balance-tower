@@ -9,12 +9,15 @@ REVIEW = ROOT / "art_review" / "zen_16bit_v2"
 OUT = ROOT / "assets" / "skins" / "zen" / "v2"
 
 SECTION_SOURCES = [
-    REVIEW / "start_clean_source.png",
+    REVIEW / "chapter0_base_source.png",
     REVIEW / "chapter_shrine_source.png",
     REVIEW / "chapter_monastery_source.png",
     REVIEW / "chapter_clouds_source.png",
     REVIEW / "chapter_zenith_source.png",
 ]
+
+ANIM_SOURCE = REVIEW / "animation_sources"
+ANIM_OUT = OUT / "anim" / "chapter_0"
 
 
 def pixel_section(source: Path, destination: Path, fade_bottom: bool) -> None:
@@ -96,11 +99,54 @@ def split_stones(source: Path) -> None:
             index += 1
 
 
+def split_animation(source: Path, frame_count: int, prefix: str, size: tuple[int, int]) -> None:
+    sheet = Image.open(source).convert("RGBA")
+    cells = []
+    for index in range(frame_count):
+        left = round(sheet.width * index / frame_count)
+        right = round(sheet.width * (index + 1) / frame_count)
+        cells.append(sheet.crop((left, 0, right, sheet.height)))
+
+    bounds = [cell.getchannel("A").getbbox() for cell in cells]
+    valid = [bound for bound in bounds if bound is not None]
+    union = (
+        min(bound[0] for bound in valid),
+        min(bound[1] for bound in valid),
+        max(bound[2] for bound in valid),
+        max(bound[3] for bound in valid),
+    )
+    for index, cell in enumerate(cells):
+        frame = cell.crop(union).resize(size, Image.Resampling.NEAREST)
+        frame.save(ANIM_OUT / f"{prefix}_{index}.png")
+
+
+def split_clouds(source: Path) -> None:
+    sheet = Image.open(source).convert("RGBA")
+    for index in range(4):
+        left = round(sheet.width * index / 4)
+        right = round(sheet.width * (index + 1) / 4)
+        cloud = sheet.crop((left, 0, right, sheet.height))
+        bounds = cloud.getchannel("A").getbbox()
+        if bounds is None:
+            continue
+        cloud = cloud.crop(bounds)
+        target_width = 280
+        target_height = max(1, round(cloud.height * target_width / cloud.width))
+        cloud.resize((target_width, target_height), Image.Resampling.NEAREST).save(
+            ANIM_OUT / f"cloud_{index}.png"
+        )
+
+
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
+    ANIM_OUT.mkdir(parents=True, exist_ok=True)
     for index, source in enumerate(SECTION_SOURCES):
         pixel_section(source, OUT / f"chapter_{index}.png", index > 0)
     split_stones(REVIEW / "stones_sheet_source.png")
+    split_animation(ANIM_SOURCE / "waterfall_sheet.png", 8, "waterfall", (96, 320))
+    split_animation(ANIM_SOURCE / "sakura_sheet.png", 6, "sakura", (240, 580))
+    split_animation(ANIM_SOURCE / "banner_sheet.png", 6, "banner", (110, 330))
+    split_clouds(ANIM_SOURCE / "clouds_sheet.png")
 
 
 if __name__ == "__main__":

@@ -158,3 +158,21 @@ verdict, and consequence. Read this file before any substantial project work.
 - Consequence: this becomes the new visual baseline. Environmental animation
   must be authored against these pixel layers and may not revive the rejected
   low-poly Blender blockout or generic distortion filters.
+
+## Checkpoint 11 — Authored object animation for chapter zero
+
+- Goal: make the approved pixel-art world genuinely alive without deforming a
+  flattened background or moving rectangular cutouts.
+- Method: regenerated chapter zero as a clean base with the world inpainted
+  behind moving elements; separately authored six-frame sakura and banner
+  cycles, an eight-frame waterfall cycle, four cloud objects, lantern interiors,
+  and individual petal paths. Integrated them as `AnimatedSprite2D` objects and
+  attached transforms using integer coordinates and nearest filtering.
+- Result: waterfall foam changes internally while its silhouette remains fixed;
+  sakura and cloth use coherent drawn poses; clouds travel as whole forms;
+  lantern light stays inside its housing. Timed screenshots at one and four
+  seconds differ visibly, and a five-stone gameplay stack remains unobstructed.
+- User verdict: pending live Telegram review.
+- Consequence: chapter zero is the production template for the remaining four
+  chapters. They must receive their own clean bases, authored objects, and
+  occlusion masks rather than reusing generic overlays.
