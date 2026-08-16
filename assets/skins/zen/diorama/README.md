@@ -31,9 +31,10 @@ Together with `valley_base.png` and `sky_temple.png`, these authored chapters
 cover the full route from the terrace to roughly one hundred stones. Broad mist
 banks conceal the chapter joins without repeating story panels.
 
-Clouds drift through a restrained luminance mask, cyan water flows locally,
-the foreground canopy bends on a grid mesh while the terrace stays fixed, and
-petals remain on a separate atmosphere plane.
+The first production animation pass replaces image-warp shaders with authored
+eight-frame `AnimatedSprite2D` cycles. `live/waterfall_sheet_v2.png` redraws
+the water and foam in every frame. `live/sakura_sheet_v2.png` redraws the
+branch silhouette through a wind cycle. Petals remain independent particles.
 
 The physical pedestal remains unchanged. Its old sprite is hidden only for this
 visual experiment because the painted terrace now supplies the visible base.

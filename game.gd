@@ -184,7 +184,10 @@ func _auto_shot() -> void:
 			_update_score()
 		if OS.get_environment("BT_CLIMB") != "":
 			top_y = ground_top_y - float(OS.get_environment("BT_CLIMB"))
-		await get_tree().create_timer(1.2).timeout
+		var hold_seconds := 1.2
+		if OS.get_environment("BT_REVIEW_SECONDS") != "":
+			hold_seconds = maxf(1.2, float(OS.get_environment("BT_REVIEW_SECONDS")))
+		await get_tree().create_timer(hold_seconds).timeout
 		var im0 := get_viewport().get_texture().get_image()
 		im0.save_png("/tmp/bt_shot.png")
 		get_tree().quit()

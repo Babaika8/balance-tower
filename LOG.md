@@ -1,5 +1,13 @@
 # Log — balance-tower
 
+## 2026-08-16 — Authored Zen animation pass
+
+- Removed the active UV cloud/water warps and whole-image canopy deformation.
+- Added eight-frame authored waterfall and sakura `AnimatedSprite2D` cycles.
+- Matched the new frames to the existing valley and foreground source art.
+- Recorded 481 fixed-camera frames at 720 x 1280 and 60 FPS for visual QA.
+- Kept camera, stacking physics, stones, and input mechanics unchanged.
+
 ## 2026-08-15 — Complete vertical Zen world
 
 - Rebuilt the start around the authored valley, bridge, water, and terrace.

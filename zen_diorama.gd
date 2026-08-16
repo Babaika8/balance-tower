@@ -17,8 +17,11 @@ const HIGH_MOUNTAINS := preload("res://assets/skins/zen/diorama/high_mountains.p
 const HIGH_SKY := preload("res://assets/skins/zen/diorama/high_sky.png")
 const ZENITH := preload("res://assets/skins/zen/diorama/zenith.png")
 const NEAR := preload("res://assets/skins/zen/diorama/valley_foreground.png")
+const WATERFALL_SHEET := preload("res://assets/skins/zen/live/waterfall_sheet_v2.png")
+const SAKURA_SHEET := preload("res://assets/skins/zen/live/sakura_sheet_v2.png")
 
 var _scalable: Array[CanvasItem] = []
+var _animated_scalable: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -40,6 +43,9 @@ func _process(_delta: float) -> void:
 	var cover_scale := maxf(1.0, viewport_width / BASE_W)
 	for item in _scalable:
 		item.scale = Vector2.ONE * cover_scale
+	for data in _animated_scalable:
+		var animated: AnimatedSprite2D = data["node"]
+		animated.scale = Vector2(data["scale_x"], data["scale_y"]) * cover_scale
 
 
 func _parallax(node_name: String, depth: Vector2, z: int) -> Parallax2D:
@@ -58,59 +64,23 @@ func _parallax(node_name: String, depth: Vector2, z: int) -> Parallax2D:
 
 
 func _build_far(parent: Node) -> void:
-	var sky_shader := Shader.new()
-	sky_shader.code = """
-shader_type canvas_item;
-uniform sampler2D art : source_color, filter_linear;
-uniform float seam_top = 0.0;
-uniform float seam_bottom = 1.0;
-void fragment() {
-	vec4 base = texture(art, UV);
-	float pale = smoothstep(0.58, 0.92, dot(base.rgb, vec3(0.299, 0.587, 0.114)));
-	float blue = smoothstep(0.02, 0.24, base.b - base.r * 0.72);
-	float cloud = pale * (1.0 - blue);
-	vec2 drift_uv = UV + vec2(sin(TIME * 0.055 + UV.y * 5.0) * 0.0025, cos(TIME * 0.04 + UV.x * 4.0) * 0.0015);
-	vec4 moving = texture(art, drift_uv);
-	vec4 color = mix(base, moving, cloud * 0.42);
-	float top_fade = smoothstep(0.0, 0.16, UV.y + seam_top);
-	float bottom_fade = 1.0 - smoothstep(seam_bottom - 0.16, seam_bottom, UV.y);
-	COLOR = vec4(color.rgb, color.a * top_fade * bottom_fade);
-}
-"""
-	var lower_material := ShaderMaterial.new()
-	lower_material.shader = sky_shader
-	lower_material.set_shader_parameter("art", FAR)
-	var lower := _mesh_sprite(FAR, FAR_LOWER_CENTER, lower_material)
+	var lower := _sprite(FAR, FAR_LOWER_CENTER)
 	parent.add_child(lower)
 	_scalable.append(lower)
 
-	var upper_material := ShaderMaterial.new()
-	upper_material.shader = sky_shader
-	upper_material.set_shader_parameter("art", SKY_TEMPLE)
-	upper_material.set_shader_parameter("seam_bottom", 0.96)
-	var upper := _mesh_sprite(SKY_TEMPLE, FAR_UPPER_CENTER, upper_material)
+	var upper := _sprite(SKY_TEMPLE, FAR_UPPER_CENTER)
 	parent.add_child(upper)
 	_scalable.append(upper)
 
-	var high_material := ShaderMaterial.new()
-	high_material.shader = sky_shader
-	high_material.set_shader_parameter("art", HIGH_MOUNTAINS)
-	var high := _mesh_sprite(HIGH_MOUNTAINS, FAR_HIGH_CENTER, high_material)
+	var high := _sprite(HIGH_MOUNTAINS, FAR_HIGH_CENTER)
 	parent.add_child(high)
 	_scalable.append(high)
 
-	var sky_material := ShaderMaterial.new()
-	sky_material.shader = sky_shader
-	sky_material.set_shader_parameter("art", HIGH_SKY)
-	var final_sky := _mesh_sprite(HIGH_SKY, FAR_SKY_CENTER, sky_material)
+	var final_sky := _sprite(HIGH_SKY, FAR_SKY_CENTER)
 	parent.add_child(final_sky)
 	_scalable.append(final_sky)
 
-	var zenith_material := ShaderMaterial.new()
-	zenith_material.shader = sky_shader
-	zenith_material.set_shader_parameter("art", ZENITH)
-	zenith_material.set_shader_parameter("seam_bottom", 1.04)
-	var zenith := _mesh_sprite(ZENITH, FAR_ZENITH_CENTER, zenith_material)
+	var zenith := _sprite(ZENITH, FAR_ZENITH_CENTER)
 	parent.add_child(zenith)
 	_scalable.append(zenith)
 
@@ -146,57 +116,23 @@ func _add_transition_mist(parent: Node, center_y: float) -> void:
 
 
 func _build_mid(parent: Node) -> void:
-	var shader := Shader.new()
-	shader.code = """
-shader_type canvas_item;
-uniform sampler2D art : source_color, filter_linear;
-void fragment() {
-	vec4 base = texture(art, UV);
-	float cyan = smoothstep(0.05, 0.26, base.g - base.r * 0.72) * smoothstep(0.18, 0.55, base.b);
-	float foam = smoothstep(0.62, 0.92, dot(base.rgb, vec3(0.299, 0.587, 0.114))) * cyan;
-	vec2 water_uv = UV + vec2(sin(UV.y * 95.0 + TIME * 1.7) * 0.0024, -fract(TIME * 0.028) * 0.018);
-	vec4 flowing = texture(art, water_uv);
-	vec3 water = mix(base.rgb, flowing.rgb, cyan * 0.68);
-	water += vec3(0.08, 0.11, 0.12) * foam * (0.5 + 0.5 * sin(UV.y * 140.0 - TIME * 3.2));
-	COLOR = vec4(water, base.a);
-}
-"""
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	material.set_shader_parameter("art", MID)
-	var mid := _mesh_sprite(MID, MID_CENTER, material)
+	var mid := _sprite(MID, MID_CENTER)
 	parent.add_child(mid)
 	_scalable.append(mid)
 
+	var waterfall := _add_animated_sheet(parent, WATERFALL_SHEET, 4, 2, 9.0,
+			Vector2(365.0, 930.0), Vector2(0.15, 0.22), 2)
+	waterfall.modulate = Color(0.60, 0.88, 0.82, 0.62)
+
 
 func _build_near(parent: Node) -> void:
-	var shader := Shader.new()
-	shader.code = """
-shader_type canvas_item;
-uniform sampler2D art : source_color, filter_linear;
-void vertex() {
-	float canopy = pow(1.0 - UV.y, 2.4);
-	float breath = sin(TIME * 0.72 + UV.y * 3.0) * 1.8;
-	float leaves = sin(TIME * 1.35 + UV.x * 8.0) * 0.8;
-	VERTEX.x += (breath + leaves) * canopy;
-	VERTEX.y += cos(TIME * 0.58 + UV.x * 4.0) * canopy * 0.7;
-}
-void fragment() {
-	vec4 color = texture(art, UV);
-	float edge_fade = smoothstep(0.0, 0.16, UV.y);
-	COLOR = vec4(color.rgb, color.a * edge_fade);
-}
-"""
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	material.set_shader_parameter("art", NEAR)
-	var near := MeshInstance2D.new()
-	near.mesh = _grid_mesh(NEAR, 18, 24)
-	near.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	near.material = material
-	near.position = NEAR_CENTER
+	var near := _sprite(NEAR, NEAR_CENTER)
 	parent.add_child(near)
 	_scalable.append(near)
+
+	var sakura := _add_animated_sheet(parent, SAKURA_SHEET, 4, 2, 5.5,
+			Vector2(142.0, 292.0), Vector2(0.58, 0.58), 1)
+	sakura.modulate.a = 0.92
 
 
 func _build_atmosphere(parent: Node) -> void:
@@ -230,37 +166,30 @@ func _sprite(texture: Texture2D, at: Vector2) -> Sprite2D:
 	return sprite
 
 
-func _mesh_sprite(texture: Texture2D, at: Vector2, material: Material) -> MeshInstance2D:
-	var mesh_sprite := MeshInstance2D.new()
-	mesh_sprite.mesh = _grid_mesh(texture, 12, 18)
-	mesh_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	mesh_sprite.material = material
-	mesh_sprite.position = at
-	return mesh_sprite
-
-
-func _grid_mesh(texture: Texture2D, cols: int, rows: int) -> ArrayMesh:
-	var vertices := PackedVector2Array()
-	var uvs := PackedVector2Array()
-	var indices := PackedInt32Array()
-	var size := Vector2(texture.get_width(), texture.get_height())
-	for row in range(rows + 1):
-		for col in range(cols + 1):
-			var uv := Vector2(float(col) / cols, float(row) / rows)
-			vertices.append((uv - Vector2(0.5, 0.5)) * size)
-			uvs.append(uv)
+func _add_animated_sheet(parent: Node, texture: Texture2D, columns: int, rows: int,
+		fps: float, at: Vector2, art_scale: Vector2, start_frame: int) -> AnimatedSprite2D:
+	var frames := SpriteFrames.new()
+	frames.add_animation("loop")
+	frames.set_animation_speed("loop", fps)
+	frames.set_animation_loop("loop", true)
+	var frame_size := Vector2i(texture.get_width() / columns, texture.get_height() / rows)
 	for row in range(rows):
-		for col in range(cols):
-			var a := row * (cols + 1) + col
-			var b := a + 1
-			var c := a + cols + 2
-			var d := a + cols + 1
-			indices.append_array(PackedInt32Array([a, b, c, a, c, d]))
-	var arrays: Array = []
-	arrays.resize(ArrayMesh.ARRAY_MAX)
-	arrays[ArrayMesh.ARRAY_VERTEX] = vertices
-	arrays[ArrayMesh.ARRAY_TEX_UV] = uvs
-	arrays[ArrayMesh.ARRAY_INDEX] = indices
-	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	return mesh
+		for column in range(columns):
+			var atlas := AtlasTexture.new()
+			atlas.atlas = texture
+			atlas.region = Rect2i(Vector2i(column, row) * frame_size, frame_size)
+			frames.add_frame("loop", atlas)
+	var animated := AnimatedSprite2D.new()
+	animated.sprite_frames = frames
+	animated.animation = "loop"
+	animated.position = at
+	animated.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	animated.frame = start_frame % (columns * rows)
+	animated.play()
+	parent.add_child(animated)
+	_animated_scalable.append({
+		"node": animated,
+		"scale_x": art_scale.x,
+		"scale_y": art_scale.y,
+	})
+	return animated

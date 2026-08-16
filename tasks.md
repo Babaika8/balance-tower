@@ -1,10 +1,10 @@
 # Tasks — balance-tower
 
 ## Now
-- Review the complete vertical Zen world in the live Telegram build.
+- Review the first authored-frame animation pass in the live Telegram build.
 
 ## Next
-- Tune individual authored motions after live-device review.
+- Extend authored frame cycles to flags, lantern flames, kites, and upper clouds.
 
 ## Done (as of 2026-06)
 - Core physics stacking engine, single-scene architecture.

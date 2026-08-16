@@ -45,10 +45,10 @@ sections of the vertical route.
 
 ## Animation
 
-- Sakura uses a subdivided `ArrayMesh`. Its root stays fixed while the free end
-  bends during intermittent gusts.
-- The waterfall keeps a fixed silhouette. A shader changes highlights inside
-  the flow instead of moving the whole sprite rectangle.
+- Sakura and waterfall now use eight separately drawn `AnimatedSprite2D`
+  frames. Their silhouettes and internal shapes change between frames.
+- The previous UV water shift, cloud warp, and grid-mesh tree deformation were
+  removed from the active diorama.
 - Mist is a low-opacity procedural band with slow horizontal noise drift.
 - The clean plate never changes exposure or geometry.
 - The gorge plate overlaps the start by 96 pixels and fades at its lower edge,
@@ -64,6 +64,7 @@ sections of the vertical route.
 ## Verification
 
 - Native Godot start screenshot completed without script errors.
+- Eight-second fixed-camera movie recorded at 720 x 1280 and 60 FPS.
 - Seven-second 720 x 1280, 30 FPS movie recorded from Godot Movie Maker.
 - Web export completed successfully for the Telegram build.
 - Live GitHub Pages deployment completed successfully.
