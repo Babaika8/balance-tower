@@ -1,10 +1,12 @@
 # Tasks — balance-tower
 
 ## Now
-- Review the first authored-frame animation pass in the live Telegram build.
+- Rebuild Zen animation from clean plates and world-anchored object rigs.
 
 ## Next
-- Extend authored frame cycles to flags, lantern flames, kites, and upper clouds.
+- Create clean plates without baked moving objects.
+- Add fixed pivots and foreground/background occlusion masks.
+- Activate animation only after fixed-camera video QA.
 
 ## Done (as of 2026-06)
 - Core physics stacking engine, single-scene architecture.

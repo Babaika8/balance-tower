@@ -17,11 +17,8 @@ const HIGH_MOUNTAINS := preload("res://assets/skins/zen/diorama/high_mountains.p
 const HIGH_SKY := preload("res://assets/skins/zen/diorama/high_sky.png")
 const ZENITH := preload("res://assets/skins/zen/diorama/zenith.png")
 const NEAR := preload("res://assets/skins/zen/diorama/valley_foreground.png")
-const WATERFALL_SHEET := preload("res://assets/skins/zen/live/waterfall_sheet_v2.png")
-const SAKURA_SHEET := preload("res://assets/skins/zen/live/sakura_sheet_v2.png")
 
 var _scalable: Array[CanvasItem] = []
-var _animated_scalable: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -43,9 +40,6 @@ func _process(_delta: float) -> void:
 	var cover_scale := maxf(1.0, viewport_width / BASE_W)
 	for item in _scalable:
 		item.scale = Vector2.ONE * cover_scale
-	for data in _animated_scalable:
-		var animated: AnimatedSprite2D = data["node"]
-		animated.scale = Vector2(data["scale_x"], data["scale_y"]) * cover_scale
 
 
 func _parallax(node_name: String, depth: Vector2, z: int) -> Parallax2D:
@@ -120,19 +114,11 @@ func _build_mid(parent: Node) -> void:
 	parent.add_child(mid)
 	_scalable.append(mid)
 
-	var waterfall := _add_animated_sheet(parent, WATERFALL_SHEET, 4, 2, 9.0,
-			Vector2(365.0, 930.0), Vector2(0.15, 0.22), 2)
-	waterfall.modulate = Color(0.60, 0.88, 0.82, 0.62)
-
 
 func _build_near(parent: Node) -> void:
 	var near := _sprite(NEAR, NEAR_CENTER)
 	parent.add_child(near)
 	_scalable.append(near)
-
-	var sakura := _add_animated_sheet(parent, SAKURA_SHEET, 4, 2, 5.5,
-			Vector2(142.0, 292.0), Vector2(0.58, 0.58), 1)
-	sakura.modulate.a = 0.92
 
 
 func _build_atmosphere(parent: Node) -> void:
@@ -164,32 +150,3 @@ func _sprite(texture: Texture2D, at: Vector2) -> Sprite2D:
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	sprite.position = at
 	return sprite
-
-
-func _add_animated_sheet(parent: Node, texture: Texture2D, columns: int, rows: int,
-		fps: float, at: Vector2, art_scale: Vector2, start_frame: int) -> AnimatedSprite2D:
-	var frames := SpriteFrames.new()
-	frames.add_animation("loop")
-	frames.set_animation_speed("loop", fps)
-	frames.set_animation_loop("loop", true)
-	var frame_size := Vector2i(texture.get_width() / columns, texture.get_height() / rows)
-	for row in range(rows):
-		for column in range(columns):
-			var atlas := AtlasTexture.new()
-			atlas.atlas = texture
-			atlas.region = Rect2i(Vector2i(column, row) * frame_size, frame_size)
-			frames.add_frame("loop", atlas)
-	var animated := AnimatedSprite2D.new()
-	animated.sprite_frames = frames
-	animated.animation = "loop"
-	animated.position = at
-	animated.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	animated.frame = start_frame % (columns * rows)
-	animated.play()
-	parent.add_child(animated)
-	_animated_scalable.append({
-		"node": animated,
-		"scale_x": art_scale.x,
-		"scale_y": art_scale.y,
-	})
-	return animated

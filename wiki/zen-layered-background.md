@@ -45,10 +45,10 @@ sections of the vertical route.
 
 ## Animation
 
-- Sakura and waterfall now use eight separately drawn `AnimatedSprite2D`
-  frames. Their silhouettes and internal shapes change between frames.
-- The previous UV water shift, cloud warp, and grid-mesh tree deformation were
-  removed from the active diorama.
+- The rejected sakura and waterfall `AnimatedSprite2D` overlays are retained as
+  source assets only and are not instantiated by the active diorama.
+- UV water shifts, cloud warps, and grid-mesh tree deformation are also absent
+  from the active diorama.
 - Mist is a low-opacity procedural band with slow horizontal noise drift.
 - The clean plate never changes exposure or geometry.
 - The gorge plate overlaps the start by 96 pixels and fades at its lower edge,

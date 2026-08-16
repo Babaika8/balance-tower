@@ -1,5 +1,13 @@
 # Log — balance-tower
 
+## 2026-08-16 — Rejected overlay animation
+
+- Removed the waterfall and sakura sprite-sheet overlays from the active scene.
+- Live review showed that they were not anchored to the painted world and read
+  as randomly switching stickers.
+- The next animation pass requires clean background plates, fixed attachment
+  pivots, occlusion masks, and continuous object rigs before activation.
+
 ## 2026-08-16 — Authored Zen animation pass
 
 - Removed the active UV cloud/water warps and whole-image canopy deformation.
