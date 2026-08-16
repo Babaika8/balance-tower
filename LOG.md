@@ -1,5 +1,27 @@
 # Log — balance-tower
 
+## 2026-08-16 — Animation history audit
+
+- Audited the complete Zen animation commit history from `372936d` through
+  `ffda097` after repeatedly proposing already-tried approaches.
+- Added `wiki/zen-animation-decisions.md` as the mandatory source of truth.
+- Recorded whole-image warps, sliced overlays, short sprite cycles, layered
+  prototypes, painted dioramas, and the latest procedural rebuild with explicit
+  verdicts.
+- Marked "use Spine" as insufficient by itself: a runtime or rigging tool does
+  not replace purpose-built layered art and authored motion.
+- No game code, active assets, mechanics, build, or deployment was changed.
+
+## 2026-08-16 — Latest painted rebuild review
+
+- `ffda097` replaced the active Zen visual scene with a new painted vertical
+  world and procedural water, cloud, petal, and bird motion.
+- The generated painting was positively received.
+- The animation was not accepted: objects still did not feel physically alive
+  or integrated into the world.
+- Treat this commit as the current visual baseline, not an approved animation
+  solution.
+
 ## 2026-08-16 — Rejected overlay animation
 
 - Removed the waterfall and sakura sprite-sheet overlays from the active scene.

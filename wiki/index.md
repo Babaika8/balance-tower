@@ -33,5 +33,7 @@ https://babaika8.github.io/balance-tower/
 
 ## Visual development
 
+- `zen-animation-decisions.md` — mandatory decision ledger of attempted,
+  rejected, accepted, and prohibited Zen animation approaches. Read first.
 - `zen-layered-background.md` — isolated layered Zen prototype, animation
   contract, verification, and current limitations.
