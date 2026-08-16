@@ -154,3 +154,12 @@
 - Added whole-object cloud drift, lantern interior pulses, and independent
   pixel-petal paths with fixed attachment and layering rules.
 - Verified visible time-based motion and a five-stone stack in native Godot.
+
+## 2026-08-16 — Standalone Three.js and Rapier prototype
+
+- Added `web-next`, a separate browser game that does not load Godot.
+- Rendered the existing animated Blender GLB directly with Three.js.
+- Ported the essential 720 x 1280 tower contract to Rapier2D: moving carrier,
+  drop impulse, contacts, collapse checks, score, camera climb, and three boosts.
+- Added Telegram Mini App initialization and browser-local coin persistence.
+- Kept the current live build intact and prepared isolated `/next/` deployment.

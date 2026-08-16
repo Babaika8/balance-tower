@@ -176,3 +176,20 @@ verdict, and consequence. Read this file before any substantial project work.
 - Consequence: chapter zero is the production template for the remaining four
   chapters. They must receive their own clean bases, authored objects, and
   occlusion masks rather than reusing generic overlays.
+
+## Checkpoint 12 — Standalone WebGL prototype without Godot
+
+- Goal: prove that the Telegram game can run without the Godot runtime while
+  retaining the stacking rules and using Blender as the scene source.
+- Method: created an independent `web-next` Mini App. Three.js renders the
+  existing animated Blender GLB, Rapier2D owns stone movement and contacts, and
+  plain JavaScript owns the carrier, score, camera climb, boosts, persistence,
+  and Telegram lifecycle calls.
+- Result: the browser loads without Godot JavaScript or Godot WebAssembly. A
+  centred first drop contacts the foundation and increments the score; a miss
+  triggers game over; restart and the animated GLB timeline run without console
+  errors. The prototype is isolated at `/next/`, so the current live game is
+  unaffected.
+- Visual status: the included GLB is the previously rejected low-poly technical
+  blockout. It validates the new runtime architecture, not the final art target.
+  Production work now belongs in the Blender scene rather than Godot overlays.
