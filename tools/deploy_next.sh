@@ -5,9 +5,14 @@ set -euo pipefail
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORIGIN="${DEPLOY_ORIGIN:-$(git -C "$REPO" remote get-url origin)}"
 TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
+cleanup() {
+  git -C "$REPO" worktree remove --force "$TMP/site" >/dev/null 2>&1 || true
+  rm -rf "$TMP"
+}
+trap cleanup EXIT
 
-git clone -q --depth 1 --branch gh-pages "$ORIGIN" "$TMP/site"
+git -C "$REPO" fetch origin gh-pages
+git -C "$REPO" worktree add --detach "$TMP/site" origin/gh-pages
 rm -rf "$TMP/site/next"
 mkdir -p "$TMP/site/next"
 cp -a "$REPO/web-next/." "$TMP/site/next/"
@@ -16,5 +21,5 @@ touch "$TMP/site/.nojekyll"
 git -C "$TMP/site" add -A
 git -C "$TMP/site" -c user.name="ILYA SCHERBAKOV" -c user.email="sir.fatlo@gmail.com" \
   commit -q -m "deploy WebGL prototype $(date -u +%FT%TZ)"
-git -C "$TMP/site" push origin gh-pages
+git -C "$TMP/site" push "$ORIGIN" HEAD:gh-pages
 echo "deployed -> https://babaika8.github.io/balance-tower/next/"
