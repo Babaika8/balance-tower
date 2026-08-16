@@ -5,6 +5,10 @@ onto a tower; misaligned placement makes it lean and topple (real physics, not
 Stack-style slicing). One core engine, swappable skins.
 See `spec.md` (product) and `wiki/index.md` (code map).
 
+Before substantial work, read `PROJECT_JOURNAL.md`. It records agreed goals,
+implementation methods, actual results, user verdicts, and closed approaches.
+Do not restart a rejected visual direction without materially new evidence.
+
 ## Structure
 - `main.tscn` + `game.gd` — the whole game, built in code.
 - Skins via `skin` int (0 = Zen meadow, 1 = Diner), saved to `user://skin.dat`.

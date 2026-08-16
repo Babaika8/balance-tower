@@ -33,6 +33,8 @@ https://babaika8.github.io/balance-tower/
 
 ## Visual development
 
+- `../PROJECT_JOURNAL.md` — chronological key checkpoints: goal, method,
+  observed result, user verdict, and consequence. Mandatory reading.
 - `zen-animation-decisions.md` — mandatory decision ledger of attempted,
   rejected, accepted, and prohibited Zen animation approaches. Read first.
 - `zen-layered-background.md` — isolated layered Zen prototype, animation

@@ -1,5 +1,17 @@
 # Log — balance-tower
 
+## 2026-08-16 — Restored key-point project journal
+
+- Added `PROJECT_JOURNAL.md` in the format originally required by the user:
+  agreed goal, implementation method, observed result, user verdict, and
+  consequence for every major checkpoint.
+- Reconstructed the visual project history from the repository and conversation
+  outcomes instead of recording only commit-level changes.
+- Marked the repeated "use Spine" recommendation as an error, not a new result.
+- Recorded 2.5D Blender diorama production as a new direction under analysis,
+  not as an approved solution.
+- No game implementation or live deployment was changed.
+
 ## 2026-08-16 — Animation history audit
 
 - Audited the complete Zen animation commit history from `372936d` through
