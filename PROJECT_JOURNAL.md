@@ -207,3 +207,21 @@ verdict, and consequence. Read this file before any substantial project work.
 - Result: the first dropped stone visibly contacts the illustrated foundation,
   score increments, and the existing WebGL movement and tower physics continue
   without browser errors.
+
+## Checkpoint 14 — Blender-rendered Zen loop replaces the GLB blockout
+
+- Goal: remove the visibly fake WebGL combination of a static painting and
+  unrelated animated GLB fragments, while keeping the Rapier stacking rules.
+- Method: rejected the Blender primitive blockout after visual inspection. Built
+  a `540 x 960`, 120-frame Blender composition from the approved Zen valley and
+  its transparent foreground; animated the foreground parallax, camera drift,
+  mist banks, and falling petals; rendered every frame through Blender and
+  encoded the result as a looped H.264 video texture for `web-next`.
+- Result: `/next/` now shows one cohesive Blender-rendered frame at startup;
+  the previous animated GLB and its hidden-static-geometry workaround are no
+  longer loaded. The browser check confirmed video background loading, intact
+  stone drop/game-over mechanics, and no application console errors.
+- Visual status: this is a working runtime proof, not a claim that the final
+  animation is complete. Water, branch motion, lantern response, and vertical
+  story chapters still require dedicated authored Blender shots; do not revive
+  generic warps, detached sprite overlays, or the rejected primitive scenery.

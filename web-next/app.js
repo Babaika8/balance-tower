@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import RAPIER from '@dimforge/rapier2d-compat';
 
 const W = 720;
@@ -14,7 +13,6 @@ const DROP_PUSH = 260;
 const MARGIN = 90;
 const SCALE = 10.4 / H;
 const START_SCENE_Y = 5.1;
-const ART_Y_OFFSET = 205 * SCALE;
 
 const canvas = document.querySelector('#world');
 const scoreEl = document.querySelector('#score');
@@ -28,8 +26,8 @@ let scene;
 let camera;
 let world;
 let eventQueue;
-let mixer;
 let clock;
+let zenVideo;
 let carrier;
 let carrierDirection = 1;
 let currentStone = null;
@@ -50,7 +48,7 @@ const textures = [];
 await RAPIER.init();
 setupRenderer();
 setupPhysics();
-await Promise.all([loadBackdrop(), loadBlenderWorld(), loadStoneTextures()]);
+await Promise.all([loadBackdrop(), loadStoneTextures()]);
 setupPedestal();
 spawnCarrier();
 state = 'waiting';
@@ -98,62 +96,30 @@ function setupPhysics() {
   colliderOwners.set(collider.handle, { kind: 'ground' });
 }
 
-async function loadBlenderWorld() {
-  const gltf = await new GLTFLoader().loadAsync('./assets/zen_world.glb');
-  const animatedRoots = [];
-  const animatedPrefixes = [
-    'Branch pivot', 'Cloud group', 'Kite ', 'Lantern attachment', 'Petal ',
-    'Upper cloud bank', 'Waterfall stream'
-  ];
-  gltf.scene.traverse((node) => {
-    if (animatedPrefixes.some((prefix) => node.name.startsWith(prefix))) animatedRoots.push(node);
-  });
-  const animatedNodes = new Set();
-  animatedRoots.forEach((root) => root.traverse((node) => animatedNodes.add(node)));
-  gltf.scene.traverse((node) => {
-    if (node.isLight || node.isCamera) {
-      node.visible = false;
-      return;
-    }
-    if (!node.isMesh) return;
-    if (!animatedNodes.has(node)) {
-      node.visible = false;
-      return;
-    }
-    if (node.material) {
-      const source = Array.isArray(node.material) ? node.material[0] : node.material;
-      node.material = new THREE.MeshToonMaterial({
-        color: source.color?.clone() ?? new THREE.Color(0xffffff),
-        transparent: source.transparent,
-        opacity: source.opacity,
-        side: THREE.DoubleSide
-      });
-    }
-    node.castShadow = true;
-    node.receiveShadow = true;
-    if (node.material) node.material.shadowSide = THREE.FrontSide;
-  });
-  scene.add(gltf.scene);
-  if (gltf.animations.length) {
-    mixer = new THREE.AnimationMixer(gltf.scene);
-    gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
-  }
-}
-
 async function loadBackdrop() {
-  const loader = new THREE.TextureLoader();
-  for (let i = 0; i < 5; i++) {
-    const texture = await loader.loadAsync(`./assets/chapter_${i}.png`);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.LinearMipmapLinearFilter;
-    const plane = new THREE.Mesh(
-      new THREE.PlaneGeometry(5.85, 10.4),
-      new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
-    );
-    plane.position.set(0, START_SCENE_Y + ART_Y_OFFSET + i * 10.4, -6);
-    scene.add(plane);
-  }
+  zenVideo = document.createElement('video');
+  zenVideo.src = './assets/zen_blender_loop.mp4';
+  zenVideo.muted = true;
+  zenVideo.loop = true;
+  zenVideo.playsInline = true;
+  zenVideo.preload = 'auto';
+  await new Promise((resolve, reject) => {
+    zenVideo.addEventListener('canplay', resolve, { once: true });
+    zenVideo.addEventListener('error', () => reject(new Error('Zen video could not load')), { once: true });
+    zenVideo.load();
+  });
+  const texture = new THREE.VideoTexture(zenVideo);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+  const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(5.85, 10.4),
+    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+  );
+  plane.position.set(0, START_SCENE_Y, -6);
+  scene.add(plane);
+  window.BT_zenVideo = zenVideo;
+  zenVideo.play().catch(() => {});
 }
 
 async function loadStoneTextures() {
@@ -299,8 +265,7 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
   accumulator += dt;
-  const sceneDt = clock.getDelta();
-  mixer?.update(sceneDt);
+  clock.getDelta();
 
   if (state === 'waiting' && carrier) {
     const speed = now < slowUntil ? CARRIER_SPEED * 0.42 : CARRIER_SPEED;
@@ -347,6 +312,7 @@ function activateBoost(kind) {
 
 document.querySelector('#game').addEventListener('pointerdown', (event) => {
   if (event.target.closest('button')) return;
+  zenVideo?.play().catch(() => {});
   if (state === 'waiting') drop();
   else if (state === 'gameover') restart();
 });
