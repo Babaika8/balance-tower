@@ -1,12 +1,14 @@
 # Tasks — balance-tower
 
 ## Now
-- Rebuild Zen animation from clean plates and world-anchored object rigs.
+- Build the Zen scene in Blender as independent far, mid, near, and animated
+  object layers, then integrate it into the existing game.
 
 ## Next
-- Create clean plates without baked moving objects.
-- Add fixed pivots and foreground/background occlusion masks.
-- Activate animation only after fixed-camera video QA.
+- Complete one start section with clean plates, fixed pivots, shadows, and
+  foreground/background occlusion masks.
+- Verify the existing mechanics and all three skins after integration.
+- Publish only the root Telegram build after visual and gameplay QA.
 
 ## Done (as of 2026-06)
 - Core physics stacking engine, single-scene architecture.

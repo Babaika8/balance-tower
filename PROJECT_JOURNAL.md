@@ -246,3 +246,21 @@ verdict, and consequence. Read this file before any substantial project work.
   flatten this scene into one video or image, and do not claim life until water,
   branch, lantern, atmosphere, and vertical chapters have their own finished
   motion sources.
+
+## Checkpoint 16 — Return to one game and one live address
+
+- Goal: remove the parallel WebGL experiment and continue visual production in
+  the existing complete game without splitting development or live review.
+- Method: retire `web-next`, its `/next/` deployment path, and its dedicated
+  deploy script. Keep `main` as the only source branch used for development;
+  GitHub Pages remains only the publishing mechanism for the root URL opened by
+  Telegram.
+- Result: the separate prototype is removed from the source tree. The active
+  product remains the existing game with its three scenes, physics, ads,
+  leaderboard, boosts, and scene switching.
+- User verdict: explicitly required. The task is to improve the Zen graphics,
+  not to replace the game architecture.
+- Consequence: Blender is an art-production tool for independently authored far,
+  mid, near, and animated object layers. Do not create another runtime, alternate
+  URL, or parallel game. Every accepted change must be tested and published at
+  the root Telegram URL.
