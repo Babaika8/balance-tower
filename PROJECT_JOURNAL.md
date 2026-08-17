@@ -264,3 +264,19 @@ verdict, and consequence. Read this file before any substantial project work.
   mid, near, and animated object layers. Do not create another runtime, alternate
   URL, or parallel game. Every accepted change must be tested and published at
   the root Telegram URL.
+
+## Checkpoint 17 — Layered Blender Zen world
+
+- Goal: replace the rejected flattened background motion with a coherent Zen
+  environment assembled from independent Blender objects.
+- Method: authored `ZEN_FAR`, `ZEN_MID`, and `ZEN_NEAR` roots. Built a tall
+  six-chapter camera route, separate drifting cloud banks, two waterfalls,
+  a rigged sakura crown, a hinged lantern, and flying kites. Animation uses a
+  600-frame Blender timeline exported to GLB; Godot only plays the timeline and
+  maps the unchanged gameplay camera to the three parallax depths.
+- Integration: changed only the Zen visual scene and renderer. The shared stone
+  physics, drop coordinates, boosts, ads, score, Diner, and Airport remain in
+  their existing modules.
+- Publication rule: source changes go to `main`; the root GitHub Pages build is
+  the only Telegram deployment. The retired `/next/` prototype stays deleted.
+- User verdict: pending live Telegram review.

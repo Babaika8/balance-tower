@@ -7,10 +7,19 @@ DRY="${1:-}"
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO"
 
+GODOT_BIN="${GODOT_BIN:-$(command -v godot || true)}"
+if [ -z "$GODOT_BIN" ] && [ -x "/Applications/Godot.app/Contents/MacOS/Godot" ]; then
+  GODOT_BIN="/Applications/Godot.app/Contents/MacOS/Godot"
+fi
+if [ -z "$GODOT_BIN" ]; then
+  echo "Godot executable not found. Set GODOT_BIN." >&2
+  exit 1
+fi
+
 echo ">>> [1/2] сборка веб-экспорта (Godot headless)..."
 rm -rf build/web && mkdir -p build/web
-godot --headless --import >/dev/null 2>&1 || true
-godot --headless --export-release "Web" build/web/index.html
+"$GODOT_BIN" --headless --import >/dev/null 2>&1 || true
+"$GODOT_BIN" --headless --export-release "Web" build/web/index.html
 touch build/web/.nojekyll
 echo "    билд готов ($(du -sh build/web | cut -f1))"
 

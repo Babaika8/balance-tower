@@ -1,14 +1,20 @@
 extends Node2D
 
-const WORLD := preload("res://assets/skins/zen/blender/zen_world.glb")
+const WORLD := preload("res://assets/skins/zen/blender-v2/zen_world.glb")
 const START_Z := 5.1
-const WORLD_Z_PER_PIXEL := 32.4 / 5000.0
+const WORLD_Z_PER_PIXEL := 10.4 / 1280.0
+const PARALLAX_FACTORS := {
+	"ZEN_FAR": 0.84,
+	"ZEN_MID": 0.90,
+	"ZEN_NEAR": 0.96,
+}
 
 var _camera_3d: Camera3D
 var _camera_2d: Camera2D
 var _start_camera_y := 0.0
 var _has_start := false
 var _subviewport: SubViewport
+var _parallax_roots: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -35,6 +41,7 @@ func _ready() -> void:
 	_subviewport.add_child(world)
 	_disable_imported_cameras_and_lights(world)
 	_play_world_animations(world)
+	_capture_parallax_roots(world)
 
 	var sunlight := DirectionalLight3D.new()
 	sunlight.name = "ZenSunlight"
@@ -50,7 +57,7 @@ func _ready() -> void:
 	_camera_3d.size = 10.4
 	_camera_3d.position = Vector3(0.0, START_Z, 18.5)
 	_subviewport.add_child(_camera_3d)
-	_camera_3d.look_at(Vector3(0.0, START_Z - 0.4, 0.0), Vector3.UP)
+	_camera_3d.look_at(Vector3(0.0, START_Z, 0.0), Vector3.UP)
 	_camera_3d.make_current()
 
 	var canvas := CanvasLayer.new()
@@ -75,8 +82,25 @@ func _process(_delta: float) -> void:
 	if not _has_start or _camera_3d == null:
 		return
 	var climb := maxf(0.0, _start_camera_y - _camera_2d.position.y)
-	_camera_3d.position.y = START_Z + climb * WORLD_Z_PER_PIXEL
-	_camera_3d.look_at(Vector3(0.0, _camera_3d.position.y - 0.4, 0.0), Vector3.UP)
+	var world_climb := climb * WORLD_Z_PER_PIXEL
+	_camera_3d.position.y = START_Z + world_climb
+	_camera_3d.look_at(Vector3(0.0, _camera_3d.position.y, 0.0), Vector3.UP)
+	for entry in _parallax_roots:
+		var root := entry["node"] as Node3D
+		root.position.y = float(entry["base_y"]) + world_climb * (1.0 - float(entry["factor"]))
+
+
+func _capture_parallax_roots(world: Node) -> void:
+	for root_name in PARALLAX_FACTORS:
+		var root := world.find_child(root_name, true, false) as Node3D
+		if root == null:
+			push_warning("Missing Blender parallax root: %s" % root_name)
+			continue
+		_parallax_roots.append({
+			"node": root,
+			"base_y": root.position.y,
+			"factor": PARALLAX_FACTORS[root_name],
+		})
 
 
 func _disable_imported_cameras_and_lights(node: Node) -> void:
