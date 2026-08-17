@@ -217,11 +217,32 @@ verdict, and consequence. Read this file before any substantial project work.
   its transparent foreground; animated the foreground parallax, camera drift,
   mist banks, and falling petals; rendered every frame through Blender and
   encoded the result as a looped H.264 video texture for `web-next`.
-- Result: `/next/` now shows one cohesive Blender-rendered frame at startup;
-  the previous animated GLB and its hidden-static-geometry workaround are no
-  longer loaded. The browser check confirmed video background loading, intact
-  stone drop/game-over mechanics, and no application console errors.
-- Visual status: this is a working runtime proof, not a claim that the final
-  animation is complete. Water, branch motion, lantern response, and vertical
-  story chapters still require dedicated authored Blender shots; do not revive
-  generic warps, detached sprite overlays, or the rejected primitive scenery.
+- Result: `/next/` can load one cohesive Blender-rendered frame at startup;
+  the browser check confirmed video background loading, intact stone
+  drop/game-over mechanics, and no application console errors.
+- User verdict: rejected. Although it is rendered in Blender, it remains a
+  flattened whole-scene asset with effects applied over it. It therefore repeats
+  the closed "one picture plus movement" path rather than building a world from
+  independent environmental objects.
+- Consequence: do not deploy or iterate on this video background. The next
+  implementation must begin with separately authored source objects and a
+  clean static base which contains none of the objects intended to move.
+
+## Checkpoint 15 — Independent Zen object source set
+
+- Goal: restart the Zen scene from independently authored objects rather than
+  extracting components from a finished background or moving one scene card.
+- Method: created a clean static gorge base without lantern, sakura branch, or
+  waterfall. Separately generated a hanging lantern, sakura branch, and
+  waterfall on controlled chroma mattes; keyed those mattes to alpha; assembled
+  them in Blender as separate object cards with their own hierarchy roots.
+- Result: the Blender file contains independent `base_gorge`, `sakura_root`,
+  `lantern_hook`, and `waterfall_static_source` nodes. The branch and lantern
+  have distinct physical attachment points and distinct animation curves. The
+  waterfall is intentionally still until an authored water-motion source exists.
+- User verdict: pending. This is a structural correction, not an approved final
+  visual or a deployable animation.
+- Consequence: add only standalone authored objects from this point. Do not
+  flatten this scene into one video or image, and do not claim life until water,
+  branch, lantern, atmosphere, and vertical chapters have their own finished
+  motion sources.

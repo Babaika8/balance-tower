@@ -27,7 +27,7 @@ let camera;
 let world;
 let eventQueue;
 let clock;
-let zenVideo;
+let environment;
 let carrier;
 let carrierDirection = 1;
 let currentStone = null;
@@ -97,29 +97,55 @@ function setupPhysics() {
 }
 
 async function loadBackdrop() {
-  zenVideo = document.createElement('video');
-  zenVideo.src = './assets/zen_blender_loop.mp4';
-  zenVideo.muted = true;
-  zenVideo.loop = true;
-  zenVideo.playsInline = true;
-  zenVideo.preload = 'auto';
-  await new Promise((resolve, reject) => {
-    zenVideo.addEventListener('canplay', resolve, { once: true });
-    zenVideo.addEventListener('error', () => reject(new Error('Zen video could not load')), { once: true });
-    zenVideo.load();
+  const loader = new THREE.TextureLoader();
+  const [baseTexture, branchTexture, lanternTexture, waterfallTexture] = await Promise.all([
+    loader.loadAsync('./assets/authored-v1/base_gorge.png'),
+    loader.loadAsync('./assets/authored-v1/sakura_branch.png'),
+    loader.loadAsync('./assets/authored-v1/lantern.png'),
+    loader.loadAsync('./assets/authored-v1/waterfall.png')
+  ]);
+  [baseTexture, branchTexture, lanternTexture, waterfallTexture].forEach((texture) => {
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
   });
-  const texture = new THREE.VideoTexture(zenVideo);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  texture.minFilter = THREE.LinearFilter;
-  texture.magFilter = THREE.LinearFilter;
-  const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(5.85, 10.4),
-    new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+  waterfallTexture.wrapS = THREE.ClampToEdgeWrapping;
+  waterfallTexture.wrapT = THREE.RepeatWrapping;
+  waterfallTexture.repeat.y = 1.18;
+
+  const makeCard = (texture, width, height, z, alpha = false) => new THREE.Mesh(
+    new THREE.PlaneGeometry(width, height),
+    new THREE.MeshBasicMaterial({ map: texture, transparent: alpha, alphaTest: alpha ? 0.02 : 0, depthWrite: !alpha, toneMapped: false })
   );
-  plane.position.set(0, START_SCENE_Y, -6);
-  scene.add(plane);
-  window.BT_zenVideo = zenVideo;
-  zenVideo.play().catch(() => {});
+
+  const base = makeCard(baseTexture, 5.85, 10.4, -6);
+  base.position.set(0, START_SCENE_Y, -6);
+  scene.add(base);
+
+  const branchRoot = new THREE.Group();
+  branchRoot.name = 'sakura_root';
+  branchRoot.position.set(-2.95, START_SCENE_Y + 2.43, -4.5);
+  const branch = makeCard(branchTexture, 3.57, 3.10, -4.5, true);
+  branch.position.set(1.75, 0.90, 0);
+  branchRoot.add(branch);
+  scene.add(branchRoot);
+
+  const lanternRoot = new THREE.Group();
+  lanternRoot.name = 'lantern_hook';
+  lanternRoot.position.set(2.16, START_SCENE_Y + 2.40, -4.2);
+  const lantern = makeCard(lanternTexture, 0.71, 0.95, -4.2, true);
+  lantern.position.set(0, -1.03, 0);
+  lanternRoot.add(lantern);
+  scene.add(lanternRoot);
+
+  const waterfallRoot = new THREE.Group();
+  waterfallRoot.name = 'waterfall_source';
+  waterfallRoot.position.set(1.26, START_SCENE_Y - 0.03, -4.7);
+  const waterfall = makeCard(waterfallTexture, 0.60, 1.06, -4.7, true);
+  waterfallRoot.add(waterfall);
+  scene.add(waterfallRoot);
+
+  environment = { branchRoot, lanternRoot, waterfallRoot, waterfallTexture, waterfallMaterial: waterfall.material };
 }
 
 async function loadStoneTextures() {
@@ -265,7 +291,13 @@ function frame(now) {
   const dt = Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
   accumulator += dt;
-  clock.getDelta();
+  const sceneTime = clock.getElapsedTime();
+  if (environment) {
+    environment.branchRoot.rotation.z = Math.sin(sceneTime * 0.72) * 0.010;
+    environment.lanternRoot.rotation.z = Math.sin(sceneTime * 1.18 + 0.8) * 0.034;
+    environment.waterfallTexture.offset.y = -(sceneTime * 0.12) % 1;
+    environment.waterfallMaterial.opacity = 0.90 + Math.sin(sceneTime * 4.1) * 0.06;
+  }
 
   if (state === 'waiting' && carrier) {
     const speed = now < slowUntil ? CARRIER_SPEED * 0.42 : CARRIER_SPEED;
@@ -312,7 +344,6 @@ function activateBoost(kind) {
 
 document.querySelector('#game').addEventListener('pointerdown', (event) => {
   if (event.target.closest('button')) return;
-  zenVideo?.play().catch(() => {});
   if (state === 'waiting') drop();
   else if (state === 'gameover') restart();
 });
