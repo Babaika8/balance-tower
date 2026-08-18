@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Zen</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #7FB3C8; overflow: hidden; }
+  canvas { display: block; }
+  #hud {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
+    font: 600 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45);
+    display: flex; gap: 14px; align-items: center; justify-content: center;
+  }
+  #hud input { flex: 1; max-width: 420px; }
+  #status {
+    position: fixed; top: 50%; left: 0; right: 0; text-align: center;
+    font: 600 15px/1.4 -apple-system, sans-serif; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,.45);
+  }
+</style>
+</head>
+<body>
+<div id="status">загрузка сцены…</div>
+<div id="hud" hidden>
+  <span>высота</span>
+  <input id="climb" type="range" min="0" max="100" value="0" step="0.1">
+  <span id="climbValue">0</span>
+</div>
+
+<script type="importmap">
+{ "imports": {
+    "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+const status = document.getElementById('status');
+const hud = document.getElementById('hud');
+const climbInput = document.getElementById('climb');
+const climbValue = document.getElementById('climbValue');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+// Sky: a vertical gradient behind everything, so the world sits in air rather
+// than on a flat colour.
+{
+  const canvas = document.createElement('canvas');
+  canvas.width = 4; canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+  gradient.addColorStop(0.0, '#3E7EA0');
+  gradient.addColorStop(0.55, '#7FB3C8');
+  gradient.addColorStop(1.0, '#D8E4DC');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 4, 256);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  scene.background = texture;
+}
+
+// A long lens keeps the picture reading flat like a 2D game, while still being
+// a real perspective view - which is what produces genuine parallax when the
+// camera climbs. The camera only ever moves within the XY plane; its distance
+// from the world never changes.
+const CAMERA_DISTANCE = 34;
+const camera = new THREE.PerspectiveCamera(26, innerWidth / innerHeight, 1, 200);
+camera.position.set(0, 6, CAMERA_DISTANCE);
+camera.lookAt(0, 6, 0);
+
+const sun = new THREE.DirectionalLight(0xFFE7C4, 2.1);
+sun.position.set(9, 18, 12);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -18;
+sun.shadow.camera.right = 18;
+sun.shadow.camera.top = 24;
+sun.shadow.camera.bottom = -8;
+sun.shadow.camera.far = 70;
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xBBE0F0, 0x5D7A55, 1.15));
+
+let mixer = null;
+const clock = new THREE.Clock();
+
+new GLTFLoader().load('assets/zen_scene.glb', (gltf) => {
+  const world = gltf.scene;
+  world.traverse((node) => {
+    if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+  });
+  scene.add(world);
+
+  if (gltf.animations.length) {
+    mixer = new THREE.AnimationMixer(world);
+    // Every clip runs at once - the world is alive as a whole, not one object
+    // at a time.
+    gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
+  }
+  status.hidden = true;
+  hud.hidden = false;
+}, (event) => {
+  if (event.total) {
+    status.textContent = `загрузка сцены… ${Math.round(event.loaded / event.total * 100)}%`;
+  }
+}, (error) => {
+  status.textContent = 'не удалось загрузить сцену';
+  console.error(error);
+});
+
+// Climb drives the camera up the world. Nothing else is faked: the parallax you
+// see is the real depth of the scene passing a moving lens.
+let climb = 0;
+let climbTarget = 0;
+climbInput.addEventListener('input', () => {
+  climbTarget = parseFloat(climbInput.value) * 0.16;
+  climbValue.textContent = climbInput.value;
+});
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderer.setAnimationLoop(() => {
+  const delta = Math.min(clock.getDelta(), 0.05);
+  if (mixer) mixer.update(delta);
+  climb += (climbTarget - climb) * Math.min(delta * 3.2, 1);
+  camera.position.y = 6 + climb;
+  camera.lookAt(0, camera.position.y, 0);
+  renderer.render(scene, camera);
+});
+</script>
+</body>
+</html>
