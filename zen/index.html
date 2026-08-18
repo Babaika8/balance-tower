@@ -69,6 +69,7 @@ const STYLES = {
     flat: true,
     sky: ['#7FA090', '#A8C0AC', '#DCE3D2'],
     disc: { color: '#FFFFFF', size: 5.2, x: 6.0, y: 15.0, z: -30 },
+    light: { sun: '#FFF3DC', sky: '#CDE0D2', ground: '#2A2740' },
     palette: {
       mountain_far: '#EDE4CC', mountain_near: '#C9A9A6',
       ground: '#3A3556', ground_near: '#14122A',
@@ -78,6 +79,7 @@ const STYLES = {
       water: '#4A4668', torii: '#C8324E',
       lantern: '#E8E0CE', lantern_glow: '#FFE6A8',
       petal: '#F0D8EC', post: '#221F3B',
+      roof: '#2A2740', wall: '#E8DECB', wood: '#4A3A52', trim: '#4152A8', bridge: '#B8422C', bridge_rail: '#D2603C', torii_dark: '#9E2B32',
     },
   },
   anime_dawn: {
@@ -85,6 +87,7 @@ const STYLES = {
     flat: true,
     sky: ['#F2C6C4', '#F7DAD4', '#FCEDE6'],
     disc: { color: '#C8384E', size: 6.4, x: -5.4, y: 16.5, z: -30 },
+    light: { sun: '#FFE0D2', sky: '#F7D9D2', ground: '#8E5F6B' },
     palette: {
       mountain_far: '#E3AFAE', mountain_near: '#C98A8F',
       ground: '#B8737B', ground_near: '#1E1D3A',
@@ -94,6 +97,7 @@ const STYLES = {
       water: '#DCA9AA', torii: '#2B2A4A',
       lantern: '#F6E2D8', lantern_glow: '#FFD9A0',
       petal: '#E9808F', post: '#2B2A4A',
+      roof: '#2B2A4A', wall: '#F6E2DC', wood: '#4A3550', trim: '#8E4A63', bridge: '#C8384E', bridge_rail: '#E06274', torii_dark: '#1E1D3A',
     },
   },
   anime_coral: {
@@ -101,6 +105,7 @@ const STYLES = {
     flat: true,
     sky: ['#F3C9BC', '#F8DACB', '#FBE9DE'],
     disc: { color: '#FFF1E4', size: 4.4, x: 5.0, y: 16.0, z: -30 },
+    light: { sun: '#FFE8D8', sky: '#F8DACB', ground: '#123A38' },
     palette: {
       mountain_far: '#F0CDC0', mountain_near: '#E0A896',
       ground: '#D98F74', ground_near: '#123A38',
@@ -110,6 +115,7 @@ const STYLES = {
       water: '#E6A88E', torii: '#E1613A',
       lantern: '#FFF1E4', lantern_glow: '#FFD9A0',
       petal: '#F6C3B2', post: '#123A38',
+      roof: '#123A38', wall: '#FFF1E4', wood: '#7A4A3C', trim: '#E1613A', bridge: '#E1613A', bridge_rail: '#F08A5D', torii_dark: '#0E2E2C',
     },
   },
   volume: {
@@ -137,6 +143,14 @@ const CATEGORY_RULES = [
   [/^lantern_glow/, 'lantern_glow'],
   [/^lantern/, 'lantern'],
   [/^petal/, 'petal'],
+  [/^pagoda_roof/, 'roof'],
+  [/^pagoda_wall/, 'wall'],
+  [/^pagoda_wood/, 'wood'],
+  [/^pagoda_trim/, 'trim'],
+  [/^pagoda_stone/, 'rock'],
+  [/^bridge_rail/, 'bridge_rail'],
+  [/^bridge/, 'bridge'],
+  [/^torii_dark/, 'torii_dark'],
 ];
 
 function categoryOf(materialName) {
@@ -215,8 +229,15 @@ function applyStyle(key) {
     disc.visible = false;
   }
 
-  sun.visible = !style.flat;
-  hemi.visible = !style.flat;
+  sun.visible = true;
+  hemi.visible = true;
+  sun.intensity = style.flat ? 1.35 : 2.0;
+  hemi.intensity = style.flat ? 1.5 : 1.1;
+  if (style.light) {
+    sun.color.set(style.light.sun);
+    hemi.color.set(style.light.sky);
+    hemi.groundColor.set(style.light.ground);
+  }
 
   if (!world) return;
   world.traverse((node) => {
@@ -229,7 +250,7 @@ function applyStyle(key) {
     const source = originalMaterials.get(node.uuid) || node.material;
     const category = categoryOf(source.name || '');
     const color = style.palette[category] || '#888888';
-    node.material = new THREE.MeshBasicMaterial({ color, fog: false });
+    node.material = new THREE.MeshLambertMaterial({ color });
     node.material.name = source.name;
   });
 
