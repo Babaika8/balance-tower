@@ -132,7 +132,7 @@ let world = null;
 let mixer = null;
 const clock = new THREE.Clock();
 
-new GLTFLoader().load('assets/zen_scene.glb', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=f9f7d098ea', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (!node.isMesh) return;
