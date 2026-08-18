@@ -5,29 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Zen</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #7FB3C8; overflow: hidden; }
+  html, body { margin: 0; height: 100%; background: #8FB3A6; overflow: hidden; }
   canvas { display: block; }
-  #hud {
+  #ui {
     position: fixed; left: 0; right: 0; bottom: 0;
-    padding: 14px 18px calc(14px + env(safe-area-inset-bottom));
-    font: 600 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.45);
-    display: flex; gap: 14px; align-items: center; justify-content: center;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    font: 600 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; gap: 9px; align-items: center;
+    background: linear-gradient(to top, rgba(0,0,0,.35), rgba(0,0,0,0));
   }
-  #hud input { flex: 1; max-width: 420px; }
-  #status {
-    position: fixed; top: 50%; left: 0; right: 0; text-align: center;
-    font: 600 15px/1.4 -apple-system, sans-serif; color: #fff;
-    text-shadow: 0 1px 3px rgba(0,0,0,.45);
+  #styles { display: flex; gap: 7px; flex-wrap: wrap; justify-content: center; }
+  #styles button {
+    font: inherit; padding: 7px 13px; border-radius: 999px; cursor: pointer;
+    border: 1px solid rgba(255,255,255,.55); background: rgba(0,0,0,.28); color: #fff;
+    backdrop-filter: blur(6px);
   }
+  #styles button[data-active="1"] { background: #fff; color: #1b1b2b; border-color: #fff; }
+  #climbRow { display: flex; gap: 11px; align-items: center; width: 100%; max-width: 430px;
+              color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+  #climb { flex: 1; }
+  #status { position: fixed; top: 50%; left: 0; right: 0; text-align: center;
+            font: 600 15px -apple-system, sans-serif; color: #fff;
+            text-shadow: 0 1px 3px rgba(0,0,0,.45); }
 </style>
 </head>
 <body>
 <div id="status">загрузка сцены…</div>
-<div id="hud" hidden>
-  <span>высота</span>
-  <input id="climb" type="range" min="0" max="100" value="0" step="0.1">
-  <span id="climbValue">0</span>
+<div id="ui" hidden>
+  <div id="styles"></div>
+  <div id="climbRow">
+    <span>высота</span>
+    <input id="climb" type="range" min="0" max="100" value="0" step="0.1">
+    <span id="climbValue">0</span>
+  </div>
 </div>
 
 <script type="importmap">
@@ -41,78 +51,216 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
+/* ---------------------------------------------------------------------------
+   STYLES
+
+   The world is one piece of geometry; a style is a separate layer painted over
+   it. That is the whole point of building in 3D: swapping the look of a scene
+   never touches its construction, so every world can carry its own art
+   direction and be compared side by side.
+
+   The flat styles deliberately use UNLIT materials. The reference art has no
+   shading inside a shape - depth is carried by flat colour bands, dark to pale,
+   exactly the way a vector illustration stacks its planes.
+--------------------------------------------------------------------------- */
+const STYLES = {
+  anime_temple: {
+    label: 'Храм в сумерках',
+    flat: true,
+    sky: ['#7FA090', '#A8C0AC', '#DCE3D2'],
+    disc: { color: '#FFFFFF', size: 5.2, x: 6.0, y: 15.0, z: -30 },
+    palette: {
+      mountain_far: '#EDE4CC', mountain_near: '#C9A9A6',
+      ground: '#3A3556', ground_near: '#14122A',
+      trunk: '#221F3B', branch: '#221F3B',
+      blossom: '#E8CBE4', blossom_pale: '#F5E4F1', blossom_deep: '#D3AAD2',
+      rock: '#2E2A47', rock_near: '#14122A',
+      water: '#4A4668', torii: '#C8324E',
+      lantern: '#E8E0CE', lantern_glow: '#FFE6A8',
+      petal: '#F0D8EC', post: '#221F3B',
+    },
+  },
+  anime_dawn: {
+    label: 'Розовый рассвет',
+    flat: true,
+    sky: ['#F2C6C4', '#F7DAD4', '#FCEDE6'],
+    disc: { color: '#C8384E', size: 6.4, x: -5.4, y: 16.5, z: -30 },
+    palette: {
+      mountain_far: '#E3AFAE', mountain_near: '#C98A8F',
+      ground: '#B8737B', ground_near: '#1E1D3A',
+      trunk: '#2B2A4A', branch: '#2B2A4A',
+      blossom: '#D64C6B', blossom_pale: '#F0929F', blossom_deep: '#B93755',
+      rock: '#8E5F6B', rock_near: '#1E1D3A',
+      water: '#DCA9AA', torii: '#2B2A4A',
+      lantern: '#F6E2D8', lantern_glow: '#FFD9A0',
+      petal: '#E9808F', post: '#2B2A4A',
+    },
+  },
+  anime_coral: {
+    label: 'Коралловый храм',
+    flat: true,
+    sky: ['#F3C9BC', '#F8DACB', '#FBE9DE'],
+    disc: { color: '#FFF1E4', size: 4.4, x: 5.0, y: 16.0, z: -30 },
+    palette: {
+      mountain_far: '#F0CDC0', mountain_near: '#E0A896',
+      ground: '#D98F74', ground_near: '#123A38',
+      trunk: '#123A38', branch: '#123A38',
+      blossom: '#F0A38E', blossom_pale: '#F8C7B6', blossom_deep: '#E07E68',
+      rock: '#C97F68', rock_near: '#123A38',
+      water: '#E6A88E', torii: '#E1613A',
+      lantern: '#FFF1E4', lantern_glow: '#FFD9A0',
+      petal: '#F6C3B2', post: '#123A38',
+    },
+  },
+  volume: {
+    label: 'Объёмный',
+    flat: false,
+    sky: ['#3E7EA0', '#7FB3C8', '#D8E4DC'],
+    disc: null,
+    palette: null,
+  },
+};
+
+const CATEGORY_RULES = [
+  [/^mountain_far/, 'mountain_far'],
+  [/^mountain_near/, 'mountain_near'],
+  [/^ground_ground_near/, 'ground_near'],
+  [/^ground_/, 'ground'],
+  [/^rock_near_/, 'rock_near'],
+  [/^rock_/, 'rock'],
+  [/^blossom_pale/, 'blossom_pale'],
+  [/^blossom_/, 'blossom'],
+  [/^trunk/, 'trunk'],
+  [/^post/, 'post'],
+  [/^water/, 'water'],
+  [/^torii/, 'torii'],
+  [/^lantern_glow/, 'lantern_glow'],
+  [/^lantern/, 'lantern'],
+  [/^petal/, 'petal'],
+];
+
+function categoryOf(materialName) {
+  for (const [pattern, category] of CATEGORY_RULES) {
+    if (pattern.test(materialName)) return category;
+  }
+  return 'ground';
+}
+
 const status = document.getElementById('status');
-const hud = document.getElementById('hud');
+const ui = document.getElementById('ui');
+const stylesBar = document.getElementById('styles');
 const climbInput = document.getElementById('climb');
 const climbValue = document.getElementById('climbValue');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 
-// Sky: a vertical gradient behind everything, so the world sits in air rather
-// than on a flat colour.
-{
+/* A long lens keeps the picture reading flat like a 2D illustration while the
+   perspective stays real - which is what makes the parallax genuine when the
+   camera climbs. The camera moves only within the XY plane. */
+const camera = new THREE.PerspectiveCamera(26, innerWidth / innerHeight, 1, 300);
+camera.position.set(0, 6, 34);
+camera.lookAt(0, 6, 0);
+
+const sun = new THREE.DirectionalLight(0xFFE7C4, 2.0);
+sun.position.set(9, 18, 12);
+scene.add(sun);
+const hemi = new THREE.HemisphereLight(0xBBE0F0, 0x5D7A55, 1.1);
+scene.add(hemi);
+
+/* The celestial disc sits far behind everything and never moves with the
+   camera's climb, so it reads as sky rather than scenery. */
+const disc = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 64),
+  new THREE.MeshBasicMaterial({ color: 0xffffff })
+);
+disc.visible = false;
+scene.add(disc);
+
+function makeSkyTexture(stops) {
   const canvas = document.createElement('canvas');
   canvas.width = 4; canvas.height = 256;
   const ctx = canvas.getContext('2d');
   const gradient = ctx.createLinearGradient(0, 0, 0, 256);
-  gradient.addColorStop(0.0, '#3E7EA0');
-  gradient.addColorStop(0.55, '#7FB3C8');
-  gradient.addColorStop(1.0, '#D8E4DC');
+  gradient.addColorStop(0.0, stops[0]);
+  gradient.addColorStop(0.55, stops[1]);
+  gradient.addColorStop(1.0, stops[2]);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, 4, 256);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  scene.background = texture;
+  return texture;
 }
 
-// A long lens keeps the picture reading flat like a 2D game, while still being
-// a real perspective view - which is what produces genuine parallax when the
-// camera climbs. The camera only ever moves within the XY plane; its distance
-// from the world never changes.
-const CAMERA_DISTANCE = 34;
-const camera = new THREE.PerspectiveCamera(26, innerWidth / innerHeight, 1, 200);
-camera.position.set(0, 6, CAMERA_DISTANCE);
-camera.lookAt(0, 6, 0);
-
-const sun = new THREE.DirectionalLight(0xFFE7C4, 2.1);
-sun.position.set(9, 18, 12);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-sun.shadow.camera.left = -18;
-sun.shadow.camera.right = 18;
-sun.shadow.camera.top = 24;
-sun.shadow.camera.bottom = -8;
-sun.shadow.camera.far = 70;
-sun.shadow.bias = -0.0008;
-scene.add(sun);
-scene.add(new THREE.HemisphereLight(0xBBE0F0, 0x5D7A55, 1.15));
-
+let world = null;
 let mixer = null;
+const originalMaterials = new Map();
 const clock = new THREE.Clock();
 
-new GLTFLoader().load('assets/zen_scene.glb', (gltf) => {
-  const world = gltf.scene;
+function applyStyle(key) {
+  const style = STYLES[key];
+  scene.background = makeSkyTexture(style.sky);
+
+  if (style.disc) {
+    disc.visible = true;
+    disc.material.color.set(style.disc.color);
+    disc.scale.setScalar(style.disc.size);
+    disc.position.set(style.disc.x, style.disc.y, style.disc.z);
+  } else {
+    disc.visible = false;
+  }
+
+  sun.visible = !style.flat;
+  hemi.visible = !style.flat;
+
+  if (!world) return;
   world.traverse((node) => {
-    if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+    if (!node.isMesh) return;
+    if (!style.flat) {
+      const original = originalMaterials.get(node.uuid);
+      if (original) node.material = original;
+      return;
+    }
+    const source = originalMaterials.get(node.uuid) || node.material;
+    const category = categoryOf(source.name || '');
+    const color = style.palette[category] || '#888888';
+    node.material = new THREE.MeshBasicMaterial({ color, fog: false });
+    node.material.name = source.name;
+  });
+
+  for (const button of stylesBar.children) {
+    button.dataset.active = button.dataset.key === key ? '1' : '0';
+  }
+}
+
+for (const [key, style] of Object.entries(STYLES)) {
+  const button = document.createElement('button');
+  button.textContent = style.label;
+  button.dataset.key = key;
+  button.addEventListener('click', () => applyStyle(key));
+  stylesBar.appendChild(button);
+}
+
+new GLTFLoader().load('assets/zen_scene.glb', (gltf) => {
+  world = gltf.scene;
+  world.traverse((node) => {
+    if (node.isMesh) originalMaterials.set(node.uuid, node.material);
   });
   scene.add(world);
 
   if (gltf.animations.length) {
     mixer = new THREE.AnimationMixer(world);
-    // Every clip runs at once - the world is alive as a whole, not one object
-    // at a time.
+    // Every clip runs at once: the world is alive as a whole.
     gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
   }
+  applyStyle('anime_temple');
   status.hidden = true;
-  hud.hidden = false;
+  ui.hidden = false;
 }, (event) => {
   if (event.total) {
     status.textContent = `загрузка сцены… ${Math.round(event.loaded / event.total * 100)}%`;
@@ -122,8 +270,6 @@ new GLTFLoader().load('assets/zen_scene.glb', (gltf) => {
   console.error(error);
 });
 
-// Climb drives the camera up the world. Nothing else is faked: the parallax you
-// see is the real depth of the scene passing a moving lens.
 let climb = 0;
 let climbTarget = 0;
 climbInput.addEventListener('input', () => {
@@ -143,6 +289,7 @@ renderer.setAnimationLoop(() => {
   climb += (climbTarget - climb) * Math.min(delta * 3.2, 1);
   camera.position.y = 6 + climb;
   camera.lookAt(0, camera.position.y, 0);
+  disc.position.y = 15 + climb * 0.12;   // the sky drifts far slower than the land
   renderer.render(scene, camera);
 });
 </script>
