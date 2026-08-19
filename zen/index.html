@@ -25,7 +25,7 @@
 <div id="status">загрузка…</div>
 <div id="ui" hidden>
   <span>высота</span>
-  <input id="climb" type="range" min="0" max="100" value="0" step="0.1">
+  <input id="climb" type="range" min="0" max="200" value="0" step="0.1">
   <span id="climbValue">0</span>
 </div>
 
@@ -96,10 +96,34 @@ const hemi = new THREE.HemisphereLight(0xBFE0C8, 0x4A5A46, 0.6);
 scene.add(hemi);
 
 let world = null;
+let fuji = null;
+let fujiBaseY = 0;
 
-new GLTFLoader().load('assets/zen_scene.glb?v=e68c3fc68eccd20a3503563e0cc9bfbe', (gltf) => {
+/* The Fuji is lifted by the climb, and that is deliberate rather than
+   physical. A static mountain cannot do what the owner drew: as the camera
+   rises, EVERYTHING in the distance sinks down the frame, the far things
+   just more slowly than the near ones. So parallax alone reveals more of
+   the Fuji while its summit still travels downward - measured, it drops
+   about a fifth of the frame between climb 100 and climb 200, where the
+   drawing asks for the summit to leave the frame through the top instead.
+
+   Climb 100 is left exactly where the geometry puts it, which is already
+   the drawn frame. Past that the mountain is raised so the summit clears
+   the top edge by climb 200, and the ridges keep sinking on their own. */
+const CLIMB_UNIT = 0.16;             // slider value -> camera height units
+const FUJI_LIFT = 40.0;              // scene units at full reveal
+const FUJI_FROM = 100 * CLIMB_UNIT;  // starts emerging at slider 100
+const FUJI_TO = 150 * CLIMB_UNIT;    // fully out by slider 150
+
+function fujiLift(cameraClimb) {
+  const t = Math.min(1, Math.max(0, (cameraClimb - FUJI_FROM) / (FUJI_TO - FUJI_FROM)));
+  return FUJI_LIFT * t * t * (3 - 2 * t);   // smoothstep, so it eases in
+}
+
+new GLTFLoader().load('assets/zen_scene.glb?v=55f73aecce539c0b1ff1bf5c6a5f3caf', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
+    if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
     if (!node.isMesh) return;
     if (node.geometry.attributes.color) node.material.vertexColors = true;
     node.material.roughness = 0.9;
@@ -130,6 +154,7 @@ renderer.setAnimationLoop(() => {
   climb += (climbTarget - climb) * 0.06;
   camera.position.y = BASE_Y + climb;
   camera.lookAt(0, camera.position.y - 3.0, 0);
+  if (fuji) fuji.position.y = fujiBaseY + fujiLift(climb);
   renderer.render(scene, camera);
 });
 </script>
