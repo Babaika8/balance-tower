@@ -22,7 +22,7 @@
 </style>
 </head>
 <body>
-<div id="status">загрузка сцены…</div>
+<div id="status">загрузка…</div>
 <div id="ui" hidden>
   <span>высота</span>
   <input id="climb" type="range" min="0" max="100" value="0" step="0.1">
@@ -39,28 +39,16 @@
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 /* ---------------------------------------------------------------------------
-   ONE committed look. No style switcher: every earlier pass spread effort
-   across four half-finished palettes instead of pushing one to the end.
-
-   The scene geometry is already painted (each mesh carries a baked vertex-
-   colour shading gradient, dark where it faces away from the sun). What turns
-   that into a Rayman/Sackboy-grade picture at runtime is three things layered
-   on top of the real geometry: a warm key + cool rim light pair (rim light
-   is placed BEHIND the scene facing the camera, so every silhouette edge
-   catches a kiss of light - the single biggest signature of that look),
-   atmospheric fog for real depth, and bloom so the lantern and the moon
-   actually glow instead of being a flat bright shape.
+   STEP ONE: sky and ground, nothing else. Every previous pass tried to solve
+   the whole scene - pagoda, trees, bridge, lantern, bloom - at once, and kept
+   getting rejected as a whole. Reduced to the two things a landscape needs
+   first, so each can be judged on its own before anything else is added.
 --------------------------------------------------------------------------- */
-const SKY_TOP = '#5C8577';
-const SKY_MID = '#8FB79E';
-const SKY_LOW = '#E9DFB8';
-const FOG_COLOR = '#CBD9BE';
+const SKY_TOP = '#4E7A68';
+const SKY_MID = '#8CB79A';
+const SKY_LOW = '#EFE3C0';
 
 const status = document.getElementById('status');
 const ui = document.getElementById('ui');
@@ -72,101 +60,58 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.02;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(new THREE.Color(FOG_COLOR).getHex(), 48, 72);
 
 function makeSkyTexture() {
   const canvas = document.createElement('canvas');
-  canvas.width = 4; canvas.height = 256;
+  canvas.width = 4; canvas.height = 512;
   const ctx = canvas.getContext('2d');
-  const gradient = ctx.createLinearGradient(0, 0, 0, 256);
+  const gradient = ctx.createLinearGradient(0, 0, 0, 512);
   gradient.addColorStop(0.0, SKY_TOP);
-  gradient.addColorStop(0.6, SKY_MID);
+  gradient.addColorStop(0.62, SKY_MID);
   gradient.addColorStop(1.0, SKY_LOW);
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 4, 256);
+  ctx.fillRect(0, 0, 4, 512);
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return texture;
 }
 scene.background = makeSkyTexture();
 
-/* A long lens keeps the picture reading like a flat illustration while the
-   perspective stays real, so the camera's climb produces genuine parallax. */
 const camera = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 1, 300);
 const CAMERA_Z = 40;
 const BASE_Y = 4.0;
 camera.position.set(0, BASE_Y, CAMERA_Z);
-camera.lookAt(0, BASE_Y, 0);
+camera.lookAt(0, BASE_Y - 3.0, 0);
 
-// Key light: warm, low, like late-afternoon sun.
-const key = new THREE.DirectionalLight(0xFFEAC8, 2.4);
+// One key light and one soft fill - nothing else competing for attention
+// while sky and ground are being judged on their own.
+const key = new THREE.DirectionalLight(0xFFEAC8, 2.2);
 key.position.set(-6, 15, 18);
 scene.add(key);
-
-// Rim light: placed BEHIND the scene, aimed back at the camera. It never lights
-// a front-facing surface head-on - it only catches the edges that curve away,
-// which is exactly what puts a glowing outline on foliage and rooftops.
-const rim = new THREE.DirectionalLight(0xFFC98A, 1.6);
-rim.position.set(4, 10, -30);
-scene.add(rim);
-
-// Soft sky/ground fill so nothing falls to pure black.
-const hemi = new THREE.HemisphereLight(0xBFE0C8, 0x4A5A46, 0.55);
+const hemi = new THREE.HemisphereLight(0xBFE0C8, 0x4A5A46, 0.6);
 scene.add(hemi);
 
-/* The sun/moon disc sits far behind everything and drifts far slower than the
-   land when the camera climbs, so it reads as sky. Emissive + bloom = glow. */
-const disc = new THREE.Mesh(
-  new THREE.CircleGeometry(1, 64),
-  new THREE.MeshBasicMaterial({ color: new THREE.Color(0xFFF3D9).multiplyScalar(2.6), fog: false })
-);
-disc.scale.setScalar(3.8);
-disc.position.set(5.5, 13.5, -34);
-scene.add(disc);
-
 let world = null;
-let mixer = null;
-const clock = new THREE.Clock();
 
-new GLTFLoader().load('assets/zen_scene.glb?v=32402b0fee', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=ground1', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (!node.isMesh) return;
-    // Every mesh was exported with a baked vertex-colour shading gradient;
-    // multiplying it into the material's own colour is what makes the scene
-    // read as painted instead of flat-shaded.
-    if (node.geometry.attributes.color) {
-      node.material.vertexColors = true;
-    }
-    node.material.roughness = Math.min(node.material.roughness ?? 0.8, 0.85);
+    if (node.geometry.attributes.color) node.material.vertexColors = true;
+    node.material.roughness = 0.9;
     node.material.needsUpdate = true;
   });
   scene.add(world);
-
-  if (gltf.animations.length) {
-    mixer = new THREE.AnimationMixer(world);
-    gltf.animations.forEach((clip) => mixer.clipAction(clip).play());
-  }
   status.hidden = true;
   ui.hidden = false;
-}, (event) => {
-  if (event.total) {
-    status.textContent = `загрузка сцены… ${Math.round(event.loaded / event.total * 100)}%`;
-  }
-}, (error) => {
-  status.textContent = 'не удалось загрузить сцену';
+}, undefined, (error) => {
+  status.textContent = 'ошибка загрузки';
   console.error(error);
 });
-
-const composer = new EffectComposer(renderer);
-composer.addPass(new RenderPass(scene, camera));
-const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.5, 0.65, 0.78);
-composer.addPass(bloom);
-composer.addPass(new OutputPass());
 
 let climb = 0;
 let climbTarget = 0;
@@ -179,17 +124,13 @@ addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
-  composer.setSize(innerWidth, innerHeight);
 });
 
 renderer.setAnimationLoop(() => {
-  const delta = Math.min(clock.getDelta(), 0.05);
-  if (mixer) mixer.update(delta);
-  climb += (climbTarget - climb) * Math.min(delta * 3.2, 1);
+  climb += (climbTarget - climb) * 0.06;
   camera.position.y = BASE_Y + climb;
-  camera.lookAt(0, camera.position.y, 0);
-  disc.position.y = 13.5 + climb * 0.1;
-  composer.render();
+  camera.lookAt(0, camera.position.y - 3.0, 0);
+  renderer.render(scene, camera);
 });
 </script>
 </body>
