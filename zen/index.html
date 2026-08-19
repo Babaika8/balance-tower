@@ -67,7 +67,7 @@ const ui = document.getElementById('ui');
 const climbInput = document.getElementById('climb');
 const climbValue = document.getElementById('climbValue');
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -98,7 +98,7 @@ scene.background = makeSkyTexture();
    perspective stays real, so the camera's climb produces genuine parallax. */
 const camera = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 1, 300);
 const CAMERA_Z = 40;
-const BASE_Y = 7.5;
+const BASE_Y = 4.0;
 camera.position.set(0, BASE_Y, CAMERA_Z);
 camera.lookAt(0, BASE_Y, 0);
 
@@ -132,7 +132,7 @@ let world = null;
 let mixer = null;
 const clock = new THREE.Clock();
 
-new GLTFLoader().load('assets/zen_scene.glb?v=f9f7d098ea', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=32402b0fee', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (!node.isMesh) return;
