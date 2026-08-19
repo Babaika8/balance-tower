@@ -120,7 +120,7 @@ function fujiLift(cameraClimb) {
   return FUJI_LIFT * t * t * (3 - 2 * t);   // smoothstep, so it eases in
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=55f73aecce539c0b1ff1bf5c6a5f3caf', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=c32b666220c8b2604cb0b276e8897cce', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
