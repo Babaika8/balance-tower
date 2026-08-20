@@ -111,19 +111,48 @@ let fujiBaseY = 0;
    the drawn frame. Past that the mountain is raised so the summit clears
    the top edge by climb 200, and the ridges keep sinking on their own. */
 const CLIMB_UNIT = 0.16;             // slider value -> camera height units
-const FUJI_LIFT = 40.0;              // scene units at full reveal
+const FUJI_LIFT = 56.0;              // scene units at full reveal
 const FUJI_FROM = 100 * CLIMB_UNIT;  // starts emerging at slider 100
-const FUJI_TO = 150 * CLIMB_UNIT;    // fully out by slider 150
+const FUJI_TO = 200 * CLIMB_UNIT;    // fully out by slider 200
+const FUJI_EASE = 1.8;
 
+/* Decelerating, so the mountain keeps uncovering itself through the whole
+   second half of the climb instead of finishing early. The exponent is set
+   so slider 150 still lands on the lift that was signed off there. */
 function fujiLift(cameraClimb) {
   const t = Math.min(1, Math.max(0, (cameraClimb - FUJI_FROM) / (FUJI_TO - FUJI_FROM)));
-  return FUJI_LIFT * t * t * (3 - 2 * t);   // smoothstep, so it eases in
+  return FUJI_LIFT * (1 - Math.pow(1 - t, FUJI_EASE));
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=c32b666220c8b2604cb0b276e8897cce', (gltf) => {
+/* The clouds are separate little shapes filling a zone, not two long
+   ribbons: the owner's two strokes marked WHERE clouds should be, not the
+   clouds themselves. Each drifts sideways and slowly breathes its width, so
+   the zone travels and changes shape. Farther clouds drift slower, which
+   keeps the depth reading. */
+const clouds = [];
+const CLOUD_SPAN = { cloudhi_: 45.0, cloudlo_: 36.0 };
+
+function wrapSpan(v, span) {
+  const half = span * 0.5;
+  return ((v + half) % span + span) % span - half;
+}
+
+new GLTFLoader().load('assets/zen_scene.glb?v=a6e2b42d9f2730fcf1f399285730caa2', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
+    const prefix = node.name.startsWith('cloudhi_') ? 'cloudhi_'
+                 : node.name.startsWith('cloudlo_') ? 'cloudlo_' : null;
+    if (prefix) {
+      clouds.push({
+        node,
+        baseX: node.position.x,
+        span: CLOUD_SPAN[prefix],
+        speed: (prefix === 'cloudhi_' ? 0.22 : 0.36) * (0.7 + 0.6 * Math.random()),
+        phase: Math.random() * Math.PI * 2,
+        breathe: 0.10 + 0.09 * Math.random(),
+      });
+    }
     if (!node.isMesh) return;
     if (node.geometry.attributes.color) node.material.vertexColors = true;
     node.material.roughness = 0.9;
@@ -155,6 +184,13 @@ renderer.setAnimationLoop(() => {
   camera.position.y = BASE_Y + climb;
   camera.lookAt(0, camera.position.y - 3.0, 0);
   if (fuji) fuji.position.y = fujiBaseY + fujiLift(climb);
+
+  const now = performance.now() * 0.001;
+  for (const c of clouds) {
+    c.node.position.x = wrapSpan(c.baseX + now * c.speed, c.span);
+    c.node.scale.x = 1 + c.breathe * Math.sin(now * 0.21 + c.phase);
+    c.node.scale.z = 1 + c.breathe * 0.45 * Math.sin(now * 0.17 + c.phase * 1.7);
+  }
   renderer.render(scene, camera);
 });
 </script>
