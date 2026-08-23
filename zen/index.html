@@ -127,6 +127,21 @@ function fujiLift(cameraClimb) {
   return FUJI_LIFT * t * t * (3 - 2 * t);
 }
 
+/* The sun comes up on the right, starting after the Fuji is already on its
+   way so the two do not arrive together. It sits farther out than the
+   mountain, so the sinking ridges uncover it and the disc itself only
+   drifts - the same reason the Fuji stopped looking like it was flying. */
+const SUN_LIFT = 26.0;
+const SUN_FROM = 130 * CLIMB_UNIT;
+const SUN_TO = 200 * CLIMB_UNIT;
+let sun = null;
+let sunBaseY = 0;
+
+function sunLift(cameraClimb) {
+  const t = Math.min(1, Math.max(0, (cameraClimb - SUN_FROM) / (SUN_TO - SUN_FROM)));
+  return SUN_LIFT * t * t * (3 - 2 * t);
+}
+
 /* The clouds are separate little shapes filling a zone, not two long
    ribbons: the owner's two strokes marked WHERE clouds should be, not the
    clouds themselves. Each drifts sideways and slowly breathes its width, so
@@ -140,10 +155,11 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=d17c3afc9cc535625f57559454ed59ef', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=6cf38174d3adfeaec7f962a672ece90c', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
+    if (node.name === 'sun') { sun = node; sunBaseY = node.position.y; }
     const prefix = node.name.startsWith('cloudhi_') ? 'cloudhi_'
                  : node.name.startsWith('cloudlo_') ? 'cloudlo_' : null;
     if (prefix) {
@@ -187,6 +203,7 @@ renderer.setAnimationLoop(() => {
   camera.position.y = BASE_Y + climb;
   camera.lookAt(0, camera.position.y - 3.0, 0);
   if (fuji) fuji.position.y = fujiBaseY + fujiLift(climb);
+  if (sun) sun.position.y = sunBaseY + sunLift(climb);
 
   const now = performance.now() * 0.001;
   for (const c of clouds) {
