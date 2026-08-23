@@ -155,7 +155,7 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=6cf38174d3adfeaec7f962a672ece90c', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=83a9ab01db9d37f14b49544838da896e', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
