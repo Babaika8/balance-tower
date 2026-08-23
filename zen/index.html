@@ -131,7 +131,7 @@ function fujiLift(cameraClimb) {
    way so the two do not arrive together. It sits farther out than the
    mountain, so the sinking ridges uncover it and the disc itself only
    drifts - the same reason the Fuji stopped looking like it was flying. */
-const SUN_LIFT = 92.0;
+const SUN_LIFT = 122.0;
 const SUN_FROM = 140 * CLIMB_UNIT;
 const SUN_TO = 300 * CLIMB_UNIT;
 let sun = null;
@@ -155,7 +155,7 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=14ebcc6207d2de851e872a8ae01fa8af', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=a9b09e7bf2c4dc1c640a1c07da2430c1', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
