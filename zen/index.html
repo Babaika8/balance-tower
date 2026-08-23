@@ -81,7 +81,9 @@ function makeSkyTexture() {
 }
 scene.background = makeSkyTexture();
 
-const camera = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 1, 300);
+// Far plane well past the Fuji: it now sits at ~470 units, and the old 300
+// would have clipped it out of the scene entirely.
+const camera = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 1, 1200);
 const CAMERA_Z = 40;
 const BASE_Y = 4.0;
 camera.position.set(0, BASE_Y, CAMERA_Z);
@@ -111,7 +113,7 @@ let fujiBaseY = 0;
    the drawn frame. Past that the mountain is raised so the summit clears
    the top edge by climb 200, and the ridges keep sinking on their own. */
 const CLIMB_UNIT = 0.16;             // slider value -> camera height units
-const FUJI_LIFT = 56.0;              // scene units at full reveal
+const FUJI_LIFT = 20.0;              // scene units at full reveal
 const FUJI_FROM = 100 * CLIMB_UNIT;  // starts emerging at slider 100
 const FUJI_TO = 200 * CLIMB_UNIT;    // fully out by slider 200
 /* Even, across the whole range. The previous curve decelerated - it was set
@@ -138,7 +140,7 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=a6e2b42d9f2730fcf1f399285730caa2', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=d17c3afc9cc535625f57559454ed59ef', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
