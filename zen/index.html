@@ -25,7 +25,7 @@
 <div id="status">загрузка…</div>
 <div id="ui" hidden>
   <span>высота</span>
-  <input id="climb" type="range" min="0" max="200" value="0" step="0.1">
+  <input id="climb" type="range" min="0" max="300" value="0" step="0.1">
   <span id="climbValue">0</span>
 </div>
 
@@ -131,9 +131,9 @@ function fujiLift(cameraClimb) {
    way so the two do not arrive together. It sits farther out than the
    mountain, so the sinking ridges uncover it and the disc itself only
    drifts - the same reason the Fuji stopped looking like it was flying. */
-const SUN_LIFT = 26.0;
-const SUN_FROM = 130 * CLIMB_UNIT;
-const SUN_TO = 200 * CLIMB_UNIT;
+const SUN_LIFT = 104.0;
+const SUN_FROM = 140 * CLIMB_UNIT;
+const SUN_TO = 300 * CLIMB_UNIT;
 let sun = null;
 let sunBaseY = 0;
 
@@ -155,7 +155,7 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=83a9ab01db9d37f14b49544838da896e', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=6fb1f97ee69958056f7c5a74b7880eae', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
