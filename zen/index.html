@@ -46,9 +46,75 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
    getting rejected as a whole. Reduced to the two things a landscape needs
    first, so each can be judged on its own before anything else is added.
 --------------------------------------------------------------------------- */
-const SKY_TOP = '#4E7A68';
-const SKY_MID = '#8CB79A';
-const SKY_LOW = '#EFE3C0';
+/* "Прохладный сумрак" - the palette already chosen for this game and living
+   in game.gd's _atmo_phases(): teal morning, soft day, plum sunset, cold
+   night, walked through by how high the tower has grown. Its four stops are
+   carried over here unchanged and mapped onto the climb, so the Zen page and
+   the shipped game speak the same colours.
+
+   The game's own hill tint is NOT carried over. It is a multiplier tuned to
+   that scene's warm hills, and on these cool blue-grey silhouettes it turned
+   everything muddy brown against a teal sky. Instead each layer's colour is
+   derived from the sky of the moment: aerial perspective, where a shape sits
+   closer to the sky the further away it is. That keeps every phase coherent
+   by construction - plum mountains under a plum sunset, near-black under a
+   night sky - and keeps the depth order fixed whatever the hour. */
+const PHASES = [
+  { at:   0, top: '#A9C7BF', mid: '#C6D6CD', low: '#E3D2CB', sun: '#FFF6E9' },
+  { at: 100, top: '#8FB4AC', mid: '#BFD3CA', low: '#DCC9C6', sun: '#FBF3E0' },
+  { at: 200, top: '#5E6796', mid: '#9A7E9E', low: '#D98E72', sun: '#FF9A5A' },
+  { at: 300, top: '#141B33', mid: '#23264A', low: '#3A3560', sun: '#E7E9F6' },
+];
+
+// How far each layer sits from the sky's own colour. Farther things are
+// hazier and paler, nearer things darker and denser.
+const HAZE = {
+  mtn_fuji: 0.20,
+  mtn_far: 0.38,
+  mtn_near: 0.58,
+  ground_near: 0.76,
+};
+const CLOUD_LIFTEN = 0.34;   // clouds sit lighter than the sky, not darker
+const SNOW_LIGHTEN = 0.78;
+
+const _a = new THREE.Color(), _b = new THREE.Color();
+const WHITE = new THREE.Color(1, 1, 1);
+const skyTop = new THREE.Color(), skyMid = new THREE.Color(), skyLow = new THREE.Color();
+const sunColour = new THREE.Color(), deepColour = new THREE.Color();
+
+function samplePhase(slider) {
+  let i = 0;
+  while (i < PHASES.length - 2 && slider > PHASES[i + 1].at) i++;
+  const p = PHASES[i], q = PHASES[i + 1];
+  const t = Math.min(1, Math.max(0, (slider - p.at) / (q.at - p.at)));
+  const mix = (key, out) => out.copy(_a.setStyle(p[key])).lerp(_b.setStyle(q[key]), t);
+  mix('top', skyTop); mix('mid', skyMid); mix('low', skyLow); mix('sun', sunColour);
+  // The dark end every silhouette leans toward: the sky's own top, deepened,
+  // so the hue always belongs to the hour.
+  deepColour.copy(skyTop).multiplyScalar(0.42);
+}
+
+/* Everything is built in the sky's own hue, moving only lightness and
+   saturation. Mixing two colours instead - a warm horizon against a cool
+   shadow - is what turned the mountains to brown mud: blending across hues
+   lands in the dead middle. Staying on one hue cannot do that, and the
+   receding layers read as one palette at every hour of the climb. */
+const _hsl = { h: 0, s: 0, l: 0 };
+
+function layerColour(name, out) {
+  if (name === 'sun') return out.copy(sunColour);
+  skyMid.getHSL(_hsl);
+  if (name === 'fuji_snow') {
+    return out.setHSL(_hsl.h, _hsl.s * 0.28, Math.min(0.97, _hsl.l + 0.34));
+  }
+  if (name.startsWith('cloud')) {
+    return out.setHSL(_hsl.h, _hsl.s * 0.62, _hsl.l + (1 - _hsl.l) * CLOUD_LIFTEN);
+  }
+  const haze = HAZE[name] ?? 0;
+  const l = _hsl.l + (0.13 - _hsl.l) * haze;
+  const s = Math.min(1, _hsl.s * (1 + haze * 0.9));
+  return out.setHSL(_hsl.h, s, l);
+}
 
 const status = document.getElementById('status');
 const ui = document.getElementById('ui');
@@ -65,21 +131,24 @@ document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
 
-function makeSkyTexture() {
-  const canvas = document.createElement('canvas');
-  canvas.width = 4; canvas.height = 512;
-  const ctx = canvas.getContext('2d');
-  const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-  gradient.addColorStop(0.0, SKY_TOP);
-  gradient.addColorStop(0.62, SKY_MID);
-  gradient.addColorStop(1.0, SKY_LOW);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, 4, 512);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
+/* One canvas and one texture, repainted in place as the phase drifts -
+   making a fresh CanvasTexture every frame would leak GPU memory. */
+const skyCanvas = document.createElement('canvas');
+skyCanvas.width = 4; skyCanvas.height = 512;
+const skyCtx = skyCanvas.getContext('2d');
+const skyTexture = new THREE.CanvasTexture(skyCanvas);
+skyTexture.colorSpace = THREE.SRGBColorSpace;
+scene.background = skyTexture;
+
+function paintSky() {
+  const gradient = skyCtx.createLinearGradient(0, 0, 0, 512);
+  gradient.addColorStop(0.0, '#' + skyTop.getHexString());
+  gradient.addColorStop(0.62, '#' + skyMid.getHexString());
+  gradient.addColorStop(1.0, '#' + skyLow.getHexString());
+  skyCtx.fillStyle = gradient;
+  skyCtx.fillRect(0, 0, 4, 512);
+  skyTexture.needsUpdate = true;
 }
-scene.background = makeSkyTexture();
 
 // Far plane well past the Fuji: it now sits at ~470 units, and the old 300
 // would have clipped it out of the scene entirely.
@@ -91,11 +160,7 @@ camera.lookAt(0, BASE_Y - 3.0, 0);
 
 // One key light and one soft fill - nothing else competing for attention
 // while sky and ground are being judged on their own.
-const key = new THREE.DirectionalLight(0xFFEAC8, 2.2);
-key.position.set(-6, 15, 18);
-scene.add(key);
-const hemi = new THREE.HemisphereLight(0xBFE0C8, 0x4A5A46, 0.6);
-scene.add(hemi);
+// No lights: every material is unlit, so nothing here would read them.
 
 let world = null;
 let fuji = null;
@@ -148,6 +213,7 @@ function sunLift(cameraClimb) {
    the zone travels and changes shape. Farther clouds drift slower, which
    keeps the depth reading. */
 const clouds = [];
+const tinted = [];
 const CLOUD_SPAN = { cloudhi_: 45.0, cloudlo_: 36.0 };
 
 function wrapSpan(v, span) {
@@ -155,7 +221,7 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-new GLTFLoader().load('assets/zen_scene.glb?v=a9b09e7bf2c4dc1c640a1c07da2430c1', (gltf) => {
+new GLTFLoader().load('assets/zen_scene.glb?v=2699ec2df3d656365f20fa1e211224bb', (gltf) => {
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
@@ -173,9 +239,24 @@ new GLTFLoader().load('assets/zen_scene.glb?v=a9b09e7bf2c4dc1c640a1c07da2430c1',
       });
     }
     if (!node.isMesh) return;
-    if (node.geometry.attributes.color) node.material.vertexColors = true;
-    node.material.roughness = 0.9;
-    node.material.needsUpdate = true;
+    /* Unlit. These are flat painted silhouettes, not physical surfaces, and
+       with a lit material the warm key light was tinting the palest shapes -
+       the clouds came out beige under a green sky while the darker mountains
+       barely moved. Basic material means the colour set below is exactly the
+       colour on screen, so the palette can be reasoned about. */
+    const vc = !!node.geometry.attributes.color;
+    // Double sided, because these are single flat faces: the glTF material
+    // arrived double sided and swapping to a default basic one culled every
+    // card whose winding faced away, which made the mountains vanish.
+    const vs = { vertexColors: vc, side: THREE.DoubleSide };
+    node.material = new THREE.MeshBasicMaterial(vs);
+    // Authored colour kept aside: the phase tint multiplies it every frame,
+    // so it must not be overwritten in place.
+    // The ground carries a vertex-colour gradient that multiplies whatever
+    // the material colour is, so its target has to be brightened to land on
+    // the intended value rather than being darkened twice.
+    node.userData.vc = vc;
+    tinted.push(node);
   });
   scene.add(world);
   status.hidden = true;
@@ -204,6 +285,13 @@ renderer.setAnimationLoop(() => {
   camera.lookAt(0, camera.position.y - 3.0, 0);
   if (fuji) fuji.position.y = fujiBaseY + fujiLift(climb);
   if (sun) sun.position.y = sunBaseY + sunLift(climb);
+
+  samplePhase(climb / CLIMB_UNIT);
+  paintSky();
+  for (const node of tinted) {
+    layerColour(node.name, node.material.color);
+    if (node.userData.vc) node.material.color.multiplyScalar(1.9);
+  }
 
   const now = performance.now() * 0.001;
   for (const c of clouds) {
