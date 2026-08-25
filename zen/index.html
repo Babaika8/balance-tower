@@ -167,6 +167,55 @@ function buildSkyline(geometry, columns) {
   return { minX, spanX, minY, spanY, top, columns };
 }
 
+/* The generated rock face, folded into the silhouette shading rather than
+   replacing it.
+
+   The image comes back in colour, and simply using it as the map would hand
+   the mountains a fixed blue-grey and kill the day-night palette - they
+   would stay morning-coloured at midnight. So it is reduced to luminance and
+   multiplied UNDER the silhouette shading into one canvas: the generated
+   facets and snow supply the surface, the skyline supplies the form, and
+   material.color still supplies the hour. */
+/* NOT currently wired in, and the reason matters. The generated image is a
+   PICTURE of a mountain - peaks, snow ridges, composition at the scale of a
+   whole landscape - not a surface. Stretched once across a card its detail
+   vanished; tiled small enough to read, its composition repeated as grey
+   blotches over the silhouettes. A generated image earns its place here
+   either as a whole object with transparency, the way this project used the
+   API before, or as a genuinely tileable surface - which is a different
+   prompt, not a different hookup. Kept ready for whichever we choose. */
+let ROCK = null;                  // ImageData of the generated face, or null
+
+function loadRock(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height);
+      // Luminance, then pulled toward its own mean so the texture shades
+      // rather than darkens: it should not fight the palette for brightness.
+      let sum = 0;
+      const lum = new Float32Array(c.width * c.height);
+      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
+        lum[j] = (0.2126 * d.data[i] + 0.7152 * d.data[i + 1]
+                + 0.0722 * d.data[i + 2]) / 255;
+        sum += lum[j];
+      }
+      const mean = sum / lum.length;
+      for (let j = 0; j < lum.length; j++) {
+        lum[j] = 1 + (lum[j] - mean) * 0.95;
+      }
+      ROCK = { w: c.width, h: c.height, lum };
+      resolve();
+    };
+    img.onerror = () => resolve();          // no texture is not fatal
+    img.src = url;
+  });
+}
+
 function makeSilhouetteTexture(sky, opts) {
   const W = 256, H = 256;
   const band = opts.band;              // how deep the lit edge reaches, 0..1
@@ -204,6 +253,18 @@ function makeSilhouetteTexture(sky, opts) {
         shade -= streak * 0.055 * Math.min(1, below / band);
       }
       shade += (grain(u, v) - 0.5) * opts.grain;
+      if (ROCK && opts.rock) {
+        /* Sampled by WORLD size, not by the card's bounding box. The Fuji's
+           card is hundreds of units tall - most of it the buried skirt - so
+           one image stretched across it left facets the size of the mountain
+           and nothing legible survived. Tiled every opts.rock units, a facet
+           stays a facet whichever card it lands on. */
+        const wx = (sky.minX + u * sky.spanX) / opts.rock;
+        const wy = (sky.minY + v * sky.spanY) / opts.rock;
+        const rx = ((Math.floor(wx * ROCK.w) % ROCK.w) + ROCK.w) % ROCK.w;
+        const ry = ((Math.floor(-wy * ROCK.h) % ROCK.h) + ROCK.h) % ROCK.h;
+        shade *= ROCK.lum[ry * ROCK.w + rx];
+      }
       const val = Math.max(0, Math.min(1, shade)) * 255;
       const i = (y * W + x) * 4;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
@@ -705,6 +766,8 @@ function wrapSpan(v, span) {
   const half = span * 0.5;
   return ((v + half) % span + span) % span - half;
 }
+
+await loadRock('assets/tex/rock.png');
 
 new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272', (gltf) => {
   world = gltf.scene;
