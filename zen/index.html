@@ -274,12 +274,22 @@ function roundedRect(w, h, r) {
 
 const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
 
+/* Every stone is a flat face, and if they all sat on the same plane their
+   overlapping edges would be exactly coplanar - the depth buffer cannot
+   choose between two surfaces at identical depth, so the contact patch
+   flickers as the winner changes frame to frame. Each stone therefore gets
+   its own thin depth slice, newest nearest the camera. The step is small
+   enough that the perspective size change is invisible: a sixty-stone tower
+   spans less than a unit against a forty-unit camera distance. */
+const STONE_LAYER = 0.012;
+
 function makeStoneMesh(index) {
   const mesh = new THREE.Mesh(STONE_GEO, new THREE.MeshBasicMaterial({
     side: THREE.DoubleSide,
   }));
   // Alternating shades, or a stack of identical slabs reads as one block.
   mesh.userData.shade = index % 2 ? 0.06 : -0.04;
+  mesh.userData.z = index * STONE_LAYER;
   stoneGroup.add(mesh);
   return mesh;
 }
@@ -320,8 +330,8 @@ function startPhysics() {
 
   const slab = new THREE.Mesh(roundedRect(BASE_HALF * 2, 2.0, 0.18),
     new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
-  slab.position.set(0, BASE_TOP - 1.0, 0);
-  slab.renderOrder = 1;
+  slab.position.set(0, BASE_TOP - 1.0, -STONE_LAYER);
+  slab.userData.z = -STONE_LAYER;
   slab.userData.shade = -0.08;
   stoneGroup.add(slab);
   spawnCarrier();
@@ -402,14 +412,14 @@ function updateGame(dt, now) {
 
   for (const s of stones) {
     const p = s.body.translation();
-    s.mesh.position.set(p.x, p.y, 0);
+    s.mesh.position.set(p.x, p.y, s.mesh.userData.z);
     s.mesh.rotation.z = s.body.rotation();
   }
 
   if (carrier) {
     carrier.y += (towerTop + DROP_ABOVE - carrier.y) * 0.12;
     carrier.x = Math.sin(now * 1.15) * SWING;
-    carrier.mesh.position.set(carrier.x, carrier.y, 0);
+    carrier.mesh.position.set(carrier.x, carrier.y, carrier.mesh.userData.z);
     carrier.mesh.rotation.z = 0;
   }
 
