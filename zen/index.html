@@ -177,6 +177,7 @@ renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
+const GROUND_TEX = makeGroundTexture();
 
 /* One canvas and one texture, repainted in place as the phase drifts -
    making a fresh CanvasTexture every frame would leak GPU memory. */
@@ -374,6 +375,74 @@ function makeStoneTexture(seed) {
 
 // A handful of variants so a stack is not the same stone repeated.
 const STONE_TEX = [7, 1289, 55021, 90210].map(makeStoneTexture);
+
+/* The ground is the hard one, and not for artistic reasons. It is the only
+   horizontal surface in the scene and the camera looks along it at about
+   four degrees, so it is foreshortened roughly seventeen to one between the
+   near edge and the far one. Detail that looks right underfoot turns into
+   shimmer at the horizon.
+
+   So: the pattern TILES at a fixed world size rather than being stretched
+   once across the plane, which keeps a patch the same real size wherever it
+   is; mipmaps and anisotropic filtering handle the compression; and the
+   contrast is deliberately low, because what survives seventeen-to-one
+   squeeze is broad tone, never fine grain. The existing vertex-colour
+   gradient still carries the recession - this only adds surface. */
+function tileableNoise(cells, rand) {
+  const g = new Float32Array(cells * cells);
+  for (let i = 0; i < g.length; i++) g[i] = rand();
+  const at = (ix, iy) => g[(iy % cells) * cells + (ix % cells)];
+  const smooth = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const fx = x * cells, fy = y * cells;
+    const ix = Math.floor(fx), iy = Math.floor(fy);
+    const tx = smooth(fx - ix), ty = smooth(fy - iy);
+    const a = at(ix, iy), b = at(ix + 1, iy);
+    const c = at(ix, iy + 1), d = at(ix + 1, iy + 1);
+    return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+  };
+}
+
+function makeGroundTexture() {
+  let state = 20260823;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  const N = 256;                       // power of two, so mipmaps are built
+  const broad = tileableNoise(4, rand);
+  const mid = tileableNoise(11, rand);
+  const fine = tileableNoise(29, rand);
+
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const u = x / N, v = y / N;
+      const n = (broad(u, v) - 0.5) * 0.085
+              + (mid(u, v) - 0.5) * 0.05
+              + (fine(u, v) - 0.5) * 0.022;
+      const val = Math.max(0, Math.min(1, 1.0 + n - 0.05)) * 255;
+      const i = (y * N + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // The plane is 140 x 90 world units; one tile every ~7 units keeps a patch
+  // a believable size on the ground rather than a pattern painted on it.
+  tex.repeat.set(140 / 7, 90 / 7);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
 
 const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
 
@@ -601,6 +670,7 @@ new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272',
     // card whose winding faced away, which made the mountains vanish.
     const vs = { vertexColors: vc, side: THREE.DoubleSide };
     if (TEXTURED.has(node.name)) vs.map = SHADING;
+    if (node.name === 'ground_near') vs.map = GROUND_TEX;
     node.material = new THREE.MeshBasicMaterial(vs);
     // Authored colour kept aside: the phase tint multiplies it every frame,
     // so it must not be overwritten in place.
