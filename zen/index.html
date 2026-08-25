@@ -253,6 +253,7 @@ let settleTimer = 0;
 let score = 0;
 let towerTop = BASE_TOP;
 let over = false;
+let clock = 0;                    // seconds, shared by the swing and the spawn
 
 const stoneGroup = new THREE.Group();
 scene.add(stoneGroup);
@@ -294,16 +295,27 @@ function makeStoneMesh(index) {
   return mesh;
 }
 
+// One definition of where the carrier is, so spawn and update cannot
+// disagree about it by even a frame.
+function swingAt(t) {
+  return Math.sin(t * 1.15) * SWING;
+}
+
 function spawnCarrier() {
   if (over) return;
   const mesh = makeStoneMesh(stones.length);
-  carrier = { mesh, x: 0, y: towerTop + DROP_ABOVE };
-  /* Placed NOW, not on the next frame. A new mesh starts at the origin, and
-     the carrier is moved earlier in the update than the settle check that
-     spawns it - so a stone appeared for exactly one frame at (0,0), right in
-     the middle of the stack, every single time one was placed. That one-frame
-     ghost is the flash. */
+  /* Born exactly where the swing already is, and placed immediately.
+
+     Two one-frame ghosts lived here in turn. First the mesh was left at the
+     origin until the next frame, flashing in the middle of the stack. Fixing
+     that by placing it at x = 0 only moved the ghost: the swing is a
+     function of the clock, so on the very next frame the stone jumped
+     sideways to wherever the sine had got to - a flash at the spawn point
+     instead. Reading the same clock here means there is nothing to jump
+     from. */
+  carrier = { mesh, x: swingAt(clock), y: towerTop + DROP_ABOVE };
   mesh.position.set(carrier.x, carrier.y, mesh.userData.z);
+  mesh.rotation.z = 0;
 }
 
 function startPhysics() {
@@ -425,7 +437,7 @@ function updateGame(dt, now) {
 
   if (carrier) {
     carrier.y += (towerTop + DROP_ABOVE - carrier.y) * 0.12;
-    carrier.x = Math.sin(now * 1.15) * SWING;
+    carrier.x = swingAt(now);
     carrier.mesh.position.set(carrier.x, carrier.y, carrier.mesh.userData.z);
     carrier.mesh.rotation.z = 0;
   }
@@ -533,6 +545,7 @@ renderer.setAnimationLoop(() => {
   const dt = Math.min(0.05, now - prev);
   prev = now;
 
+  clock = now;
   updateGame(dt, now);
 
   /* The tower drives the camera, and the manual slider stays as a way to
@@ -560,6 +573,14 @@ renderer.setAnimationLoop(() => {
     if (Math.abs(mesh.position.x) < 1e-6 && Math.abs(mesh.position.y) < 1e-6) {
       window.__ghosts = (window.__ghosts || 0) + 1;
     }
+    // A stone that leaps between its first two drawn frames is the same bug
+    // wearing a different position.
+    const last = mesh.userData.lastX;
+    if (last !== undefined && Math.abs(mesh.position.x - last) > 0.35
+        && mesh.userData.settled !== true) {
+      window.__jumps = (window.__jumps || 0) + 1;
+    }
+    mesh.userData.lastX = mesh.position.x;
   }
 
   for (const c of clouds) {
