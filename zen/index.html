@@ -240,7 +240,7 @@ const tinted = [];
 --------------------------------------------------------------------------- */
 const STONE_W = 2.6, STONE_H = STONE_W / 3.2;
 const BASE_TOP = -1.5;            // ground level, where the tower starts
-const DROP_ABOVE = 5.0;           // how far over the tower the carrier rides
+const DROP_ABOVE = 3.2;           // how far over the tower the carrier rides
 const SWING = 2.0;                // how far the carrier travels each way
 const BASE_HALF = STONE_W * 1.1;  // the foundation, wider than one stone
 const CAM_DEADZONE = 4.2;         // the camera holds still for the first few
@@ -290,8 +290,21 @@ function spawnCarrier() {
 }
 
 function startPhysics() {
-  physics = new RAPIER.World({ x: 0.0, y: -26.0 });
+  physics = new RAPIER.World({ x: 0.0, y: -20.0 });
   physics.timestep = 1 / 60;
+  /* Stone, not rubber. A stone read as bouncy for four separate reasons and
+     restitution was the smallest of them:
+       - it fell from five units under heavy gravity, hitting at ~16 u/s, and
+         at that speed even a dead-inelastic contact pops as the solver
+         pushes the overlap back out;
+       - the solver ran few iterations, so a fresh contact stayed soft and
+         the whole stack jiggled while it tightened;
+       - the stones were light, so contact impulses moved them easily;
+       - and damping was low, so whatever wobble started took a long time to
+         die.
+     Gravity and drop height are down, iterations up, stones heavier and
+     better damped, and restitution is now exactly zero. */
+  if ('numSolverIterations' in physics) physics.numSolverIterations = 12;
   accumulator = 0;
 
   // The base the tower is built on: fixed, and wider than a stone so the
@@ -301,7 +314,9 @@ function startPhysics() {
   // Deep, not a slab: a thin floor is easy for a fast body to skip past in
   // one step, and the first stone was tunnelling straight through it.
   physics.createCollider(RAPIER.ColliderDesc.cuboid(BASE_HALF, 8.0)
-    .setFriction(1.1), ground);
+    .setFriction(1.6)
+    .setRestitution(0.0)
+    .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min), ground);
 
   const slab = new THREE.Mesh(roundedRect(BASE_HALF * 2, 2.0, 0.18),
     new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
@@ -317,11 +332,15 @@ function dropStone() {
 
   const body = physics.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
     .setTranslation(carrier.x, carrier.y)
-    .setLinearDamping(0.15)
-    .setAngularDamping(0.4)
+    .setLinearDamping(0.45)
+    .setAngularDamping(0.9)
     .setCcdEnabled(true));
   physics.createCollider(RAPIER.ColliderDesc.cuboid(STONE_W / 2, STONE_H / 2)
-    .setFriction(1.1).setRestitution(0.02).setDensity(1.4), body);
+    .setFriction(1.6)
+    .setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max)
+    .setRestitution(0.0)
+    .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min)
+    .setDensity(3.0), body);
 
   falling = { body, mesh: carrier.mesh };
   stones.push(falling);
