@@ -24,21 +24,25 @@
 <body>
 <div id="status">загрузка…</div>
 <div id="ui" hidden>
-  <span>высота</span>
-  <input id="climb" type="range" min="0" max="300" value="0" step="0.1">
+  <span id="score">0</span>
+  <span style="opacity:.7">камней</span>
+  <input id="climb" type="range" min="0" max="300" value="0" step="0.1"
+         title="ручной просмотр высоты">
   <span id="climbValue">0</span>
 </div>
 
 <script type="importmap">
 { "imports": {
     "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+    "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/",
+    "rapier": "https://unpkg.com/@dimforge/rapier2d-compat@0.14.0/rapier.es.js"
 } }
 </script>
 
 <script type="module">
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import RAPIER from 'rapier';
 
 /* ---------------------------------------------------------------------------
    STEP ONE: sky and ground, nothing else. Every previous pass tried to solve
@@ -116,10 +120,19 @@ function layerColour(name, out) {
   return out.setHSL(_hsl.h, s, l);
 }
 
+// Stones are the nearest thing in the scene, so they sit darkest of all, with
+// a little shade alternation so a stack does not read as one solid block.
+function stoneColour(shade, out) {
+  skyMid.getHSL(_hsl);
+  const l = Math.min(0.92, Math.max(0.05, _hsl.l + (0.13 - _hsl.l) * 0.88 + shade));
+  return out.setHSL(_hsl.h, Math.min(1, _hsl.s * 1.7), l);
+}
+
 const status = document.getElementById('status');
 const ui = document.getElementById('ui');
 const climbInput = document.getElementById('climb');
 const climbValue = document.getElementById('climbValue');
+const scoreLabel = document.getElementById('score');
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -214,6 +227,193 @@ function sunLift(cameraClimb) {
    keeps the depth reading. */
 const clouds = [];
 const tinted = [];
+
+/* ---------------------------------------------------------------------------
+   THE GAME. Stones swing overhead, a tap drops one, and real physics decides
+   whether it stays. Rapier owns every stone's motion and contact; nothing
+   here fakes a landing.
+
+   The stones keep the game's own proportions - 180 x 56 logical pixels, so
+   3.2 wide to 1 tall - and live on the z = 0 plane, which is where the
+   ground already sits, so the camera framing worked out for the background
+   holds for gameplay too.
+--------------------------------------------------------------------------- */
+const STONE_W = 2.6, STONE_H = STONE_W / 3.2;
+const BASE_TOP = -1.5;            // ground level, where the tower starts
+const DROP_ABOVE = 5.0;           // how far over the tower the carrier rides
+const SWING = 2.0;                // how far the carrier travels each way
+const BASE_HALF = STONE_W * 1.1;  // the foundation, wider than one stone
+const CAM_DEADZONE = 4.2;         // the camera holds still for the first few
+
+let physics = null;               // the Rapier world, once its wasm is ready
+const stones = [];                // { body, mesh, half }
+let carrier = null;               // the stone being swung, not yet dropped
+let falling = null;               // the stone in flight
+let settleTimer = 0;
+let score = 0;
+let towerTop = BASE_TOP;
+let over = false;
+
+const stoneGroup = new THREE.Group();
+scene.add(stoneGroup);
+
+function roundedRect(w, h, r) {
+  const s = new THREE.Shape();
+  const x = -w / 2, y = -h / 2;
+  s.moveTo(x + r, y);
+  s.lineTo(x + w - r, y);
+  s.quadraticCurveTo(x + w, y, x + w, y + r);
+  s.lineTo(x + w, y + h - r);
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  s.lineTo(x + r, y + h);
+  s.quadraticCurveTo(x, y + h, x, y + h - r);
+  s.lineTo(x, y + r);
+  s.quadraticCurveTo(x, y, x + r, y);
+  return new THREE.ShapeGeometry(s, 6);
+}
+
+const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
+
+function makeStoneMesh(index) {
+  const mesh = new THREE.Mesh(STONE_GEO, new THREE.MeshBasicMaterial({
+    side: THREE.DoubleSide,
+  }));
+  // Alternating shades, or a stack of identical slabs reads as one block.
+  mesh.userData.shade = index % 2 ? 0.06 : -0.04;
+  stoneGroup.add(mesh);
+  return mesh;
+}
+
+function spawnCarrier() {
+  if (over) return;
+  carrier = { mesh: makeStoneMesh(stones.length), x: 0, y: towerTop + DROP_ABOVE };
+}
+
+function startPhysics() {
+  physics = new RAPIER.World({ x: 0.0, y: -26.0 });
+  physics.timestep = 1 / 60;
+  accumulator = 0;
+
+  // The base the tower is built on: fixed, and wider than a stone so the
+  // first drop has something forgiving to land on.
+  const ground = physics.createRigidBody(RAPIER.RigidBodyDesc.fixed()
+    .setTranslation(0, BASE_TOP - 8.0));
+  // Deep, not a slab: a thin floor is easy for a fast body to skip past in
+  // one step, and the first stone was tunnelling straight through it.
+  physics.createCollider(RAPIER.ColliderDesc.cuboid(BASE_HALF, 8.0)
+    .setFriction(1.1), ground);
+
+  const slab = new THREE.Mesh(roundedRect(BASE_HALF * 2, 2.0, 0.18),
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+  slab.position.set(0, BASE_TOP - 1.0, 0);
+  slab.renderOrder = 1;
+  slab.userData.shade = -0.08;
+  stoneGroup.add(slab);
+  spawnCarrier();
+}
+
+function dropStone() {
+  if (!physics || over || !carrier || falling) return;
+
+  const body = physics.createRigidBody(RAPIER.RigidBodyDesc.dynamic()
+    .setTranslation(carrier.x, carrier.y)
+    .setLinearDamping(0.15)
+    .setAngularDamping(0.4)
+    .setCcdEnabled(true));
+  physics.createCollider(RAPIER.ColliderDesc.cuboid(STONE_W / 2, STONE_H / 2)
+    .setFriction(1.1).setRestitution(0.02).setDensity(1.4), body);
+
+  falling = { body, mesh: carrier.mesh };
+  stones.push(falling);
+  carrier = null;
+  settleTimer = 0;
+}
+
+function stoneSettled(entry) {
+  const v = entry.body.linvel(), w = entry.body.angvel();
+  return Math.hypot(v.x, v.y) < 0.25 && Math.abs(w) < 0.35;
+}
+
+function endGame() {
+  over = true;
+  if (carrier) { stoneGroup.remove(carrier.mesh); carrier = null; }
+  status.textContent = `башня рассыпалась · ${score}`;
+  status.hidden = false;
+}
+
+function restart() {
+  for (const s of stones) stoneGroup.remove(s.mesh);
+  stones.length = 0;
+  if (carrier) stoneGroup.remove(carrier.mesh);
+  carrier = null; falling = null;
+  stoneGroup.clear();
+  score = 0; towerTop = BASE_TOP; over = false;
+  status.hidden = true;
+  if (physics) { physics.free(); physics = null; }
+  startPhysics();
+}
+
+// Debug probe: module scope is not reachable from the console otherwise.
+window.__zen = () => ({
+  score, over, stones: stones.length, towerTop,
+  carrier: carrier ? { x: +carrier.x.toFixed(2), y: +carrier.y.toFixed(2) } : null,
+  falling: !!falling,
+  ys: stones.map((s) => +s.body.translation().y.toFixed(2)),
+  xs: stones.map((s) => +s.body.translation().x.toFixed(2)),
+  world: physics ? {
+    bodies: physics.bodies.len(),
+    colliders: physics.colliders.len(),
+    timestep: physics.timestep,
+    gravity: physics.gravity,
+  } : null,
+});
+
+/* Stepped on a real-time accumulator rather than once per frame. The frame
+   rate is not the simulation rate: when the page ran fast the stones gained
+   an enormous velocity and shot straight through the base. */
+let accumulator = 0;
+
+function updateGame(dt, now) {
+  if (!physics) return;
+  accumulator = Math.min(0.25, accumulator + dt);
+  while (accumulator >= physics.timestep) {
+    physics.step();
+    accumulator -= physics.timestep;
+  }
+
+  for (const s of stones) {
+    const p = s.body.translation();
+    s.mesh.position.set(p.x, p.y, 0);
+    s.mesh.rotation.z = s.body.rotation();
+  }
+
+  if (carrier) {
+    carrier.y += (towerTop + DROP_ABOVE - carrier.y) * 0.12;
+    carrier.x = Math.sin(now * 1.15) * SWING;
+    carrier.mesh.position.set(carrier.x, carrier.y, 0);
+    carrier.mesh.rotation.z = 0;
+  }
+
+  if (falling) {
+    const p = falling.body.translation();
+    // Missed the tower entirely and kept going.
+    if (p.y < BASE_TOP - 6.0) { endGame(); falling = null; return; }
+    if (stoneSettled(falling)) {
+      settleTimer += dt;
+      if (settleTimer > 0.28) {
+        const tilt = Math.abs(falling.body.rotation());
+        if (tilt > 0.75) { endGame(); falling = null; return; }
+        score += 1;
+        towerTop = Math.max(towerTop, p.y + STONE_H * 0.5);
+        scoreLabel.textContent = String(score);
+        falling = null;
+        spawnCarrier();
+      }
+    } else {
+      settleTimer = 0;
+    }
+  }
+}
 const CLOUD_SPAN = { cloudhi_: 45.0, cloudlo_: 36.0 };
 
 function wrapSpan(v, span) {
@@ -261,6 +461,12 @@ new GLTFLoader().load('assets/zen_scene.glb?v=2699ec2df3d656365f20fa1e211224bb',
   scene.add(world);
   status.hidden = true;
   ui.hidden = false;
+  // Rapier ships as wasm and has to finish loading before a world exists.
+  RAPIER.init().then(startPhysics).catch((e) => {
+    status.textContent = 'физика не загрузилась';
+    status.hidden = false;
+    console.error(e);
+  });
 }, undefined, (error) => {
   status.textContent = 'ошибка загрузки';
   console.error(error);
@@ -268,9 +474,14 @@ new GLTFLoader().load('assets/zen_scene.glb?v=2699ec2df3d656365f20fa1e211224bb',
 
 let climb = 0;
 let climbTarget = 0;
+let manualClimb = 0;
 climbInput.addEventListener('input', () => {
-  climbTarget = parseFloat(climbInput.value) * 0.16;
+  manualClimb = parseFloat(climbInput.value) * CLIMB_UNIT;
   climbValue.textContent = climbInput.value;
+});
+
+renderer.domElement.addEventListener('pointerdown', () => {
+  if (over) restart(); else dropStone();
 });
 
 addEventListener('resize', () => {
@@ -279,7 +490,21 @@ addEventListener('resize', () => {
   renderer.setSize(innerWidth, innerHeight);
 });
 
+let prev = performance.now() * 0.001;
+
 renderer.setAnimationLoop(() => {
+  const now = performance.now() * 0.001;
+  const dt = Math.min(0.05, now - prev);
+  prev = now;
+
+  updateGame(dt, now);
+
+  /* The tower drives the camera, and the manual slider stays as a way to
+     look ahead at the sky without having to play that high. Whichever asks
+     for more wins, so dragging it never fights the game. */
+  const towerClimb = Math.max(0, towerTop - CAM_DEADZONE);
+  climbTarget = Math.max(towerClimb, manualClimb);
+
   climb += (climbTarget - climb) * 0.06;
   camera.position.y = BASE_Y + climb;
   camera.lookAt(0, camera.position.y - 3.0, 0);
@@ -292,8 +517,10 @@ renderer.setAnimationLoop(() => {
     layerColour(node.name, node.material.color);
     if (node.userData.vc) node.material.color.multiplyScalar(1.9);
   }
+  for (const mesh of stoneGroup.children) {
+    stoneColour(mesh.userData.shade || 0, mesh.material.color);
+  }
 
-  const now = performance.now() * 0.001;
   for (const c of clouds) {
     c.node.position.x = wrapSpan(c.baseX + now * c.speed, c.span);
     c.node.scale.x = 1 + c.breathe * Math.sin(now * 0.21 + c.phase);
