@@ -128,28 +128,85 @@ function stoneColour(shade, out) {
   return out.setHSL(_hsl.h, Math.min(1, _hsl.s * 1.7), l);
 }
 
-/* Proof that the cards take a texture now that they carry UVs: a shading
-   ramp with a little grain, drawn in code rather than shipped as a file.
-   MeshBasicMaterial multiplies map by colour, so this modulates whatever the
-   palette picked for the hour instead of replacing it - the mountain keeps
-   its colour and gains a light direction and a surface. An 8-bit map can
-   only darken, so the range stops at 1.0 and the shading works downward. */
-function makeShadingTexture() {
+/* Shading a mountain from its OWN silhouette, not from a gradient down its
+   bounding box.
+
+   A single top-to-bottom ramp knows nothing about where the ridges are, so
+   every peak and every valley got the same tone at the same height and the
+   card still read as cut paper. What actually makes a mountain legible is
+   depth below its own skyline: the metre under a ridge catches light, the
+   mass far beneath it falls away.
+
+   The skyline is not authored anywhere - it is read back off the geometry at
+   load time. For each column across the card, the highest vertex there is
+   its horizon; shading is then a function of how far below that horizon a
+   pixel sits. Works for any card without knowing which mountain it is. */
+function buildSkyline(geometry, columns) {
+  const pos = geometry.attributes.position;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (let i = 0; i < pos.count; i++) {
+    minX = Math.min(minX, pos.getX(i)); maxX = Math.max(maxX, pos.getX(i));
+    minY = Math.min(minY, pos.getY(i)); maxY = Math.max(maxY, pos.getY(i));
+  }
+  const spanX = Math.max(maxX - minX, 1e-6), spanY = Math.max(maxY - minY, 1e-6);
+  const top = new Float32Array(columns).fill(-Infinity);
+  for (let i = 0; i < pos.count; i++) {
+    const c = Math.min(columns - 1,
+      Math.floor((pos.getX(i) - minX) / spanX * columns));
+    top[c] = Math.max(top[c], pos.getY(i));
+  }
+  // Vertices only mark the corners of the outline; fill the gaps between them
+  // so the horizon is continuous rather than a comb.
+  let last = maxY;
+  for (let c = 0; c < columns; c++) {
+    if (top[c] === -Infinity) top[c] = last; else last = top[c];
+  }
+  for (let c = columns - 1; c >= 0; c--) {
+    if (top[c] === -Infinity) top[c] = last; else last = top[c];
+  }
+  return { minX, spanX, minY, spanY, top, columns };
+}
+
+function makeSilhouetteTexture(sky, opts) {
+  const W = 256, H = 256;
+  const band = opts.band;              // how deep the lit edge reaches, 0..1
+  const drop = opts.drop;              // how dark the mass below goes
+  let state = opts.seed;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  const grain = tileableNoise(9, rand);
+
   const c = document.createElement('canvas');
-  c.width = 96; c.height = 256;
+  c.width = W; c.height = H;
   const ctx = c.getContext('2d');
-  const img = ctx.createImageData(c.width, c.height);
-  for (let y = 0; y < c.height; y++) {
-    const t = y / (c.height - 1);          // 0 at top of the card
-    const ramp = 1.0 - 0.13 * t;           // ridge lit, foot denser
-    for (let x = 0; x < c.width; x++) {
-      /* No per-pixel grain. A 96x256 map stretched across a mountain makes
-         each texture row several screen pixels tall, so random noise reads
-         as horizontal banding rather than surface - visibly worse than the
-         flat colour it replaced. A smooth ramp survives the stretch. */
-      const v = Math.max(0, Math.min(1, ramp)) * 255;
-      const i = (y * c.width + x) * 4;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
+  const img = ctx.createImageData(W, H);
+  for (let x = 0; x < W; x++) {
+    const u = x / (W - 1);
+    const col = Math.min(sky.columns - 1, Math.floor(u * sky.columns));
+    // Height of this column's horizon, as a fraction of the card.
+    const horizon = (sky.top[col] - sky.minY) / sky.spanY;
+    for (let y = 0; y < H; y++) {
+      // v = 0 at the card's bottom, matching the UVs written in Blender.
+      const v = 1 - y / (H - 1);
+      const below = Math.max(0, horizon - v);
+      let shade = 1 - drop * Math.min(1, below / band);
+      if (opts.flow) {
+        /* Ice reads as flow lines running down the slope, not as blotches.
+           Narrow vertical streaks, fading as they descend. */
+        /* Two frequencies, each wandered off course by the noise, so the
+           lines do not march in step - one fixed frequency read as
+           corrugated metal rather than ice. */
+        const a = Math.sin(u * 31.0 + grain(u, 0.2) * 14.0);
+        const b = Math.sin(u * 53.0 + grain(u, 0.8) * 18.0);
+        const streak = Math.max(0, a) ** 8 * 0.6 + Math.max(0, b) ** 10 * 0.4;
+        shade -= streak * 0.055 * Math.min(1, below / band);
+      }
+      shade += (grain(u, v) - 0.5) * opts.grain;
+      const val = Math.max(0, Math.min(1, shade)) * 255;
+      const i = (y * W + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
       img.data[i + 3] = 255;
     }
   }
@@ -157,10 +214,18 @@ function makeShadingTexture() {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
   return tex;
 }
-const SHADING = makeShadingTexture();
-const TEXTURED = new Set(['mtn_far', 'mtn_near', 'mtn_fuji']);
+
+const SILHOUETTE = {
+  mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11 },
+  mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23 },
+  mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37 },
+  // The glacier: a shallower lit edge and flow lines down the ice.
+  fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true },
+};
+
 
 const status = document.getElementById('status');
 const ui = document.getElementById('ui');
@@ -669,7 +734,10 @@ new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272',
     // arrived double sided and swapping to a default basic one culled every
     // card whose winding faced away, which made the mountains vanish.
     const vs = { vertexColors: vc, side: THREE.DoubleSide };
-    if (TEXTURED.has(node.name)) vs.map = SHADING;
+    const shape = SILHOUETTE[node.name];
+    if (shape) {
+      vs.map = makeSilhouetteTexture(buildSkyline(node.geometry, 192), shape);
+    }
     if (node.name === 'ground_near') vs.map = GROUND_TEX;
     node.material = new THREE.MeshBasicMaterial(vs);
     // Authored colour kept aside: the phase tint multiplies it every frame,
