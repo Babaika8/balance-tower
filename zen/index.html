@@ -296,7 +296,14 @@ function makeStoneMesh(index) {
 
 function spawnCarrier() {
   if (over) return;
-  carrier = { mesh: makeStoneMesh(stones.length), x: 0, y: towerTop + DROP_ABOVE };
+  const mesh = makeStoneMesh(stones.length);
+  carrier = { mesh, x: 0, y: towerTop + DROP_ABOVE };
+  /* Placed NOW, not on the next frame. A new mesh starts at the origin, and
+     the carrier is moved earlier in the update than the settle check that
+     spawns it - so a stone appeared for exactly one frame at (0,0), right in
+     the middle of the stack, every single time one was placed. That one-frame
+     ghost is the flash. */
+  mesh.position.set(carrier.x, carrier.y, mesh.userData.z);
 }
 
 function startPhysics() {
@@ -548,6 +555,11 @@ renderer.setAnimationLoop(() => {
   }
   for (const mesh of stoneGroup.children) {
     stoneColour(mesh.userData.shade || 0, mesh.material.color);
+    // Ghost detector: a stone sitting at the origin means it was added to the
+    // scene but not positioned before this frame was drawn.
+    if (Math.abs(mesh.position.x) < 1e-6 && Math.abs(mesh.position.y) < 1e-6) {
+      window.__ghosts = (window.__ghosts || 0) + 1;
+    }
   }
 
   for (const c of clouds) {
