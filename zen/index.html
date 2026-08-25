@@ -304,8 +304,76 @@ function roundedRect(w, h, r) {
   s.quadraticCurveTo(x, y + h, x, y + h - r);
   s.lineTo(x, y + r);
   s.quadraticCurveTo(x, y, x + r, y);
-  return new THREE.ShapeGeometry(s, 6);
+  const geo = new THREE.ShapeGeometry(s, 6);
+  /* ShapeGeometry hands back UVs equal to the shape's own coordinates, so
+     they run -w/2..w/2 rather than 0..1 and a texture would land at an
+     arbitrary scale. Normalised here, once, at build time. */
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setXY(i, (uv.getX(i) + w / 2) / w, (uv.getY(i) + h / 2) / h);
+  }
+  uv.needsUpdate = true;
+  return geo;
 }
+
+/* Stone surface, drawn in code. Value noise rather than per-pixel random:
+   a grid of random values read back with smooth interpolation, so the
+   mottling has a size and survives being stretched across the stone. Plain
+   noise banded badly on the mountains for exactly the opposite reason - it
+   had no size at all. Two octaves give a broad blotch with finer grain over
+   it, and a top-down ramp puts the light overhead. */
+function valueNoise(w, h, cells, rand) {
+  const gw = cells + 1, gh = Math.max(2, Math.round(cells * h / w) + 1);
+  const grid = new Float32Array(gw * gh);
+  for (let i = 0; i < grid.length; i++) grid[i] = rand();
+  const smooth = (t) => t * t * (3 - 2 * t);
+  return (x, y) => {
+    const fx = x * (gw - 1), fy = y * (gh - 1);
+    const ix = Math.min(gw - 2, Math.floor(fx)), iy = Math.min(gh - 2, Math.floor(fy));
+    const tx = smooth(fx - ix), ty = smooth(fy - iy);
+    const a = grid[iy * gw + ix], b = grid[iy * gw + ix + 1];
+    const c = grid[(iy + 1) * gw + ix], d = grid[(iy + 1) * gw + ix + 1];
+    return (a + (b - a) * tx) * (1 - ty) + (c + (d - c) * tx) * ty;
+  };
+}
+
+function makeStoneTexture(seed) {
+  let state = seed;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  const W = 256, H = 80;
+  const broad = valueNoise(W, H, 5, rand);
+  const fine = valueNoise(W, H, 14, rand);
+
+  const c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    const v = y / (H - 1);
+    const lit = 1.0 - 0.16 * v;                 // light from above
+    const rim = v > 0.86 ? (v - 0.86) / 0.14 * 0.10 : 0;   // grounded edge
+    for (let x = 0; x < W; x++) {
+      const u = x / (W - 1);
+      const mottle = (broad(u, v) - 0.5) * 0.11 + (fine(u, v) - 0.5) * 0.05;
+      const val = Math.max(0, Math.min(1, lit + mottle - rim)) * 255;
+      const i = (y * W + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+// A handful of variants so a stack is not the same stone repeated.
+const STONE_TEX = [7, 1289, 55021, 90210].map(makeStoneTexture);
 
 const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
 
@@ -321,6 +389,7 @@ const STONE_LAYER = 0.012;
 function makeStoneMesh(index) {
   const mesh = new THREE.Mesh(STONE_GEO, new THREE.MeshBasicMaterial({
     side: THREE.DoubleSide,
+    map: STONE_TEX[index % STONE_TEX.length],
   }));
   // Alternating shades, or a stack of identical slabs reads as one block.
   mesh.userData.shade = index % 2 ? 0.06 : -0.04;
@@ -382,7 +451,7 @@ function startPhysics() {
     .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min), ground);
 
   const slab = new THREE.Mesh(roundedRect(BASE_HALF * 2, 2.0, 0.18),
-    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: STONE_TEX[0] }));
   slab.position.set(0, BASE_TOP - 1.0, -STONE_LAYER);
   slab.userData.z = -STONE_LAYER;
   slab.userData.shade = -0.08;
