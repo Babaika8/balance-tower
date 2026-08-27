@@ -324,7 +324,7 @@ renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-const GROUND_TEX = makeGroundTexture();
+let GROUND_TEX = null;
 
 /* One canvas and one texture, repainted in place as the phase drifts -
    making a fresh CanvasTexture every frame would leak GPU memory. */
@@ -550,45 +550,57 @@ function tileableNoise(cells, rand) {
   };
 }
 
-function makeGroundTexture() {
-  let state = 20260823;
-  const rand = () => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-  const N = 256;                       // power of two, so mipmaps are built
-  const broad = tileableNoise(4, rand);
-  const mid = tileableNoise(11, rand);
-  const fine = tileableNoise(29, rand);
+/* The generated grass, tiled across the ground.
 
-  const c = document.createElement('canvas');
-  c.width = c.height = N;
-  const ctx = c.getContext('2d');
-  const img = ctx.createImageData(N, N);
-  for (let y = 0; y < N; y++) {
-    for (let x = 0; x < N; x++) {
-      const u = x / N, v = y / N;
-      const n = (broad(u, v) - 0.5) * 0.085
-              + (mid(u, v) - 0.5) * 0.05
-              + (fine(u, v) - 0.5) * 0.022;
-      const val = Math.max(0, Math.min(1, 1.0 + n - 0.05)) * 255;
-      const i = (y * N + x) * 4;
-      img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
-      img.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(img, 0, 0);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  // The plane is 140 x 90 world units; one tile every ~7 units keeps a patch
-  // a believable size on the ground rather than a pattern painted on it.
-  tex.repeat.set(140 / 7, 90 / 7);
-  tex.generateMipmaps = true;
-  tex.minFilter = THREE.LinearMipmapLinearFilter;
-  tex.magFilter = THREE.LinearFilter;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return tex;
+   Kept at its own scale and simply repeated - one tile every seven world
+   units on BOTH axes, so tiles stay square and a clump is never stretched
+   into an oval. The plane is 140 x 90 units: twenty tiles by about thirteen.
+
+   Reduced to luminance for the same reason as the rock. The ground's colour
+   comes from the palette and travels from morning to night; a coloured map
+   would freeze it at whatever green the generator happened to pick. The
+   image supplies the blades, the palette supplies the hour.
+
+   Mipmaps and full anisotropy matter here and nowhere else: this is the one
+   surface the camera looks ALONG, foreshortened about seventeen to one
+   toward the horizon. */
+function loadGroundTexture(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = img.width; c.height = img.height;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      const d = ctx.getImageData(0, 0, c.width, c.height);
+      let sum = 0;
+      const lum = new Float32Array(c.width * c.height);
+      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
+        lum[j] = (0.2126 * d.data[i] + 0.7152 * d.data[i + 1]
+                + 0.0722 * d.data[i + 2]) / 255;
+        sum += lum[j];
+      }
+      const mean = sum / lum.length;
+      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
+        const v = Math.max(0, Math.min(1, 1 + (lum[j] - mean) * 1.15)) * 255;
+        d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
+        d.data[i + 3] = 255;
+      }
+      ctx.putImageData(d, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(140 / 7, 90 / 7);
+      tex.generateMipmaps = true;
+      tex.minFilter = THREE.LinearMipmapLinearFilter;
+      tex.magFilter = THREE.LinearFilter;
+      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      resolve(tex);
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
 }
 
 const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
@@ -789,6 +801,7 @@ function wrapSpan(v, span) {
 }
 
 await Promise.all([
+  loadGroundTexture('assets/tex/grass.png').then((t) => { GROUND_TEX = t; }),
   loadSurface('rock_near', 'assets/tex/rock_near.png'),
   loadSurface('rock_far', 'assets/tex/rock_far.png'),
   loadSurface('rock_fuji', 'assets/tex/rock_fuji.png'),
