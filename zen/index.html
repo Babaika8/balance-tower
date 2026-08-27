@@ -184,9 +184,9 @@ function buildSkyline(geometry, columns) {
    either as a whole object with transparency, the way this project used the
    API before, or as a genuinely tileable surface - which is a different
    prompt, not a different hookup. Kept ready for whichever we choose. */
-let ROCK = null;                  // ImageData of the generated face, or null
+const SURFACE = {};               // name -> { w, h, lum }
 
-function loadRock(url) {
+function loadSurface(name, url) {
   return new Promise((resolve) => {
     const img = new Image();
     img.onload = () => {
@@ -208,12 +208,18 @@ function loadRock(url) {
       for (let j = 0; j < lum.length; j++) {
         lum[j] = 1 + (lum[j] - mean) * 0.95;
       }
-      ROCK = { w: c.width, h: c.height, lum };
+      SURFACE[name] = { w: c.width, h: c.height, lum };
       resolve();
     };
     img.onerror = () => resolve();          // no texture is not fatal
     img.src = url;
   });
+}
+
+// Triangle wave: 0..1..0, so a texture read through it folds back on itself.
+function mirror(t) {
+  const m = ((t % 2) + 2) % 2;
+  return m > 1 ? 2 - m : m;
 }
 
 function makeSilhouetteTexture(sky, opts) {
@@ -253,17 +259,22 @@ function makeSilhouetteTexture(sky, opts) {
         shade -= streak * 0.055 * Math.min(1, below / band);
       }
       shade += (grain(u, v) - 0.5) * opts.grain;
-      if (ROCK && opts.rock) {
+      const surf = SURFACE[opts.surface];
+      if (surf) {
         /* Sampled by WORLD size, not by the card's bounding box. The Fuji's
            card is hundreds of units tall - most of it the buried skirt - so
            one image stretched across it left facets the size of the mountain
            and nothing legible survived. Tiled every opts.rock units, a facet
            stays a facet whichever card it lands on. */
-        const wx = (sky.minX + u * sky.spanX) / opts.rock;
-        const wy = (sky.minY + v * sky.spanY) / opts.rock;
-        const rx = ((Math.floor(wx * ROCK.w) % ROCK.w) + ROCK.w) % ROCK.w;
-        const ry = ((Math.floor(-wy * ROCK.h) % ROCK.h) + ROCK.h) % ROCK.h;
-        shade *= ROCK.lum[ry * ROCK.w + rx];
+        /* Mirrored tiling. The generated swatch is not seamless and never
+           will be reliably, but reading it back and forth - a triangle wave
+           instead of a modulo - makes ANY image tile without a seam, because
+           each edge meets its own reflection. */
+        const wx = (sky.minX + u * sky.spanX) / opts.scale;
+        const wy = (sky.minY + v * sky.spanY) / opts.scale;
+        const rx = Math.min(surf.w - 1, Math.floor(mirror(wx) * surf.w));
+        const ry = Math.min(surf.h - 1, Math.floor(mirror(-wy) * surf.h));
+        shade *= surf.lum[ry * surf.w + rx];
       }
       const val = Math.max(0, Math.min(1, shade)) * 255;
       const i = (y * W + x) * 4;
@@ -280,11 +291,15 @@ function makeSilhouetteTexture(sky, opts) {
 }
 
 const SILHOUETTE = {
-  mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11 },
-  mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23 },
-  mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37 },
+  mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11,
+               surface: 'rock', scale: 26 },
+  mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23,
+               surface: 'rock', scale: 20 },
+  mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37,
+               surface: 'rock', scale: 42 },
   // The glacier: a shallower lit edge and flow lines down the ice.
-  fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true },
+  fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true,
+               surface: 'ice', scale: 34 },
 };
 
 
@@ -767,7 +782,10 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-await loadRock('assets/tex/rock.png');
+await Promise.all([
+  loadSurface('rock', 'assets/tex/rock_surface.png'),
+  loadSurface('ice', 'assets/tex/ice_surface.png'),
+]);
 
 new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272', (gltf) => {
   world = gltf.scene;
