@@ -266,14 +266,19 @@ function makeSilhouetteTexture(sky, opts) {
            one image stretched across it left facets the size of the mountain
            and nothing legible survived. Tiled every opts.rock units, a facet
            stays a facet whichever card it lands on. */
-        /* Mirrored tiling. The generated swatch is not seamless and never
-           will be reliably, but reading it back and forth - a triangle wave
-           instead of a modulo - makes ANY image tile without a seam, because
-           each edge meets its own reflection. */
-        const wx = (sky.minX + u * sky.spanX) / opts.scale;
-        const wy = (sky.minY + v * sky.spanY) / opts.scale;
-        const rx = Math.min(surf.w - 1, Math.floor(mirror(wx) * surf.w));
-        const ry = Math.min(surf.h - 1, Math.floor(mirror(-wy) * surf.h));
+        /* Laid on once, not tiled. Each mountain has its own generated
+           swatch, so there is nothing to repeat and no seam to hide - the
+           earlier mirrored tiling was solving a problem I had created.
+
+           Vertically the texture spans opts.fit world units measured down
+           from the card's top, not the whole bounding box: the Fuji's card
+           runs hundreds of units below the mountain as a buried skirt, and
+           fitting to that would have pushed the entire texture underground. */
+        const top = sky.minY + sky.spanY;
+        const worldY = sky.minY + v * sky.spanY;
+        const ty = Math.min(1, Math.max(0, (top - worldY) / opts.fit));
+        const rx = Math.min(surf.w - 1, Math.floor(u * surf.w));
+        const ry = Math.min(surf.h - 1, Math.floor(ty * surf.h));
         shade *= surf.lum[ry * surf.w + rx];
       }
       const val = Math.max(0, Math.min(1, shade)) * 255;
@@ -291,15 +296,16 @@ function makeSilhouetteTexture(sky, opts) {
 }
 
 const SILHOUETTE = {
+  // fit = how many world units down from the top the swatch covers.
   mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11,
-               surface: 'rock', scale: 26 },
+               surface: 'rock_far', fit: 36 },
   mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23,
-               surface: 'rock', scale: 20 },
+               surface: 'rock_near', fit: 16 },
   mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37,
-               surface: 'rock', scale: 42 },
+               surface: 'rock_fuji', fit: 120 },
   // The glacier: a shallower lit edge and flow lines down the ice.
   fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true,
-               surface: 'ice', scale: 34 },
+               surface: 'ice', fit: 52 },
 };
 
 
@@ -783,7 +789,9 @@ function wrapSpan(v, span) {
 }
 
 await Promise.all([
-  loadSurface('rock', 'assets/tex/rock_surface.png'),
+  loadSurface('rock_near', 'assets/tex/rock_near.png'),
+  loadSurface('rock_far', 'assets/tex/rock_far.png'),
+  loadSurface('rock_fuji', 'assets/tex/rock_fuji.png'),
   loadSurface('ice', 'assets/tex/ice_surface.png'),
 ]);
 
