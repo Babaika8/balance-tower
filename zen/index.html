@@ -167,61 +167,6 @@ function buildSkyline(geometry, columns) {
   return { minX, spanX, minY, spanY, top, columns };
 }
 
-/* The generated rock face, folded into the silhouette shading rather than
-   replacing it.
-
-   The image comes back in colour, and simply using it as the map would hand
-   the mountains a fixed blue-grey and kill the day-night palette - they
-   would stay morning-coloured at midnight. So it is reduced to luminance and
-   multiplied UNDER the silhouette shading into one canvas: the generated
-   facets and snow supply the surface, the skyline supplies the form, and
-   material.color still supplies the hour. */
-/* NOT currently wired in, and the reason matters. The generated image is a
-   PICTURE of a mountain - peaks, snow ridges, composition at the scale of a
-   whole landscape - not a surface. Stretched once across a card its detail
-   vanished; tiled small enough to read, its composition repeated as grey
-   blotches over the silhouettes. A generated image earns its place here
-   either as a whole object with transparency, the way this project used the
-   API before, or as a genuinely tileable surface - which is a different
-   prompt, not a different hookup. Kept ready for whichever we choose. */
-const SURFACE = {};               // name -> { w, h, lum }
-
-function loadSurface(name, url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const d = ctx.getImageData(0, 0, c.width, c.height);
-      // Luminance, then pulled toward its own mean so the texture shades
-      // rather than darkens: it should not fight the palette for brightness.
-      let sum = 0;
-      const lum = new Float32Array(c.width * c.height);
-      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
-        lum[j] = (0.2126 * d.data[i] + 0.7152 * d.data[i + 1]
-                + 0.0722 * d.data[i + 2]) / 255;
-        sum += lum[j];
-      }
-      const mean = sum / lum.length;
-      for (let j = 0; j < lum.length; j++) {
-        lum[j] = 1 + (lum[j] - mean) * 0.95;
-      }
-      SURFACE[name] = { w: c.width, h: c.height, lum };
-      resolve();
-    };
-    img.onerror = () => resolve();          // no texture is not fatal
-    img.src = url;
-  });
-}
-
-// Triangle wave: 0..1..0, so a texture read through it folds back on itself.
-function mirror(t) {
-  const m = ((t % 2) + 2) % 2;
-  return m > 1 ? 2 - m : m;
-}
-
 function makeSilhouetteTexture(sky, opts) {
   const W = 256, H = 256;
   const band = opts.band;              // how deep the lit edge reaches, 0..1
@@ -259,28 +204,6 @@ function makeSilhouetteTexture(sky, opts) {
         shade -= streak * 0.055 * Math.min(1, below / band);
       }
       shade += (grain(u, v) - 0.5) * opts.grain;
-      const surf = SURFACE[opts.surface];
-      if (surf) {
-        /* Sampled by WORLD size, not by the card's bounding box. The Fuji's
-           card is hundreds of units tall - most of it the buried skirt - so
-           one image stretched across it left facets the size of the mountain
-           and nothing legible survived. Tiled every opts.rock units, a facet
-           stays a facet whichever card it lands on. */
-        /* Laid on once, not tiled. Each mountain has its own generated
-           swatch, so there is nothing to repeat and no seam to hide - the
-           earlier mirrored tiling was solving a problem I had created.
-
-           Vertically the texture spans opts.fit world units measured down
-           from the card's top, not the whole bounding box: the Fuji's card
-           runs hundreds of units below the mountain as a buried skirt, and
-           fitting to that would have pushed the entire texture underground. */
-        const top = sky.minY + sky.spanY;
-        const worldY = sky.minY + v * sky.spanY;
-        const ty = Math.min(1, Math.max(0, (top - worldY) / opts.fit));
-        const rx = Math.min(surf.w - 1, Math.floor(u * surf.w));
-        const ry = Math.min(surf.h - 1, Math.floor(ty * surf.h));
-        shade *= surf.lum[ry * surf.w + rx];
-      }
       const val = Math.max(0, Math.min(1, shade)) * 255;
       const i = (y * W + x) * 4;
       img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
@@ -296,16 +219,11 @@ function makeSilhouetteTexture(sky, opts) {
 }
 
 const SILHOUETTE = {
-  // fit = how many world units down from the top the swatch covers.
-  mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11,
-               surface: 'rock_far', fit: 36 },
-  mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23,
-               surface: 'rock_near', fit: 16 },
-  mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37,
-               surface: 'rock_fuji', fit: 120 },
+  mtn_far:   { band: 0.30, drop: 0.16, grain: 0.020, seed: 11 },
+  mtn_near:  { band: 0.26, drop: 0.22, grain: 0.026, seed: 23 },
+  mtn_fuji:  { band: 0.22, drop: 0.18, grain: 0.018, seed: 37 },
   // The glacier: a shallower lit edge and flow lines down the ice.
-  fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true,
-               surface: 'ice', fit: 52 },
+  fuji_snow: { band: 0.34, drop: 0.13, grain: 0.014, seed: 53, flow: true },
 };
 
 
@@ -324,7 +242,7 @@ renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
-let GROUND_TEX = null;
+const GROUND_TEX = makeGroundTexture();
 
 /* One canvas and one texture, repainted in place as the phase drifts -
    making a fresh CanvasTexture every frame would leak GPU memory. */
@@ -550,62 +468,45 @@ function tileableNoise(cells, rand) {
   };
 }
 
-/* The generated grass, tiled across the ground.
+function makeGroundTexture() {
+  let state = 20260823;
+  const rand = () => {
+    state = (state * 1664525 + 1013904223) >>> 0;
+    return state / 4294967296;
+  };
+  const N = 256;                       // power of two, so mipmaps are built
+  const broad = tileableNoise(4, rand);
+  const mid = tileableNoise(11, rand);
+  const fine = tileableNoise(29, rand);
 
-   Kept at its own scale and simply repeated - one tile every seven world
-   units on BOTH axes, so tiles stay square and a clump is never stretched
-   into an oval. The plane is 140 x 90 units: twenty tiles by about thirteen.
-
-   Reduced to luminance for the same reason as the rock. The ground's colour
-   comes from the palette and travels from morning to night; a coloured map
-   would freeze it at whatever green the generator happened to pick. The
-   image supplies the blades, the palette supplies the hour.
-
-   Mipmaps and full anisotropy matter here and nowhere else: this is the one
-   surface the camera looks ALONG, foreshortened about seventeen to one
-   toward the horizon. */
-function loadGroundTexture(url) {
-  return new Promise((resolve) => {
-    const img = new Image();
-    img.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = img.width; c.height = img.height;
-      const ctx = c.getContext('2d');
-      ctx.drawImage(img, 0, 0);
-      const d = ctx.getImageData(0, 0, c.width, c.height);
-      let sum = 0;
-      const lum = new Float32Array(c.width * c.height);
-      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
-        lum[j] = (0.2126 * d.data[i] + 0.7152 * d.data[i + 1]
-                + 0.0722 * d.data[i + 2]) / 255;
-        sum += lum[j];
-      }
-      const mean = sum / lum.length;
-      for (let i = 0, j = 0; i < d.data.length; i += 4, j++) {
-        const v = Math.max(0, Math.min(1, 1 + (lum[j] - mean) * 1.15)) * 255;
-        d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
-        d.data[i + 3] = 255;
-      }
-      ctx.putImageData(d, 0, 0);
-
-      const tex = new THREE.CanvasTexture(c);
-      tex.colorSpace = THREE.SRGBColorSpace;
-      /* glTF puts the UV origin at the top-left, a canvas at the bottom-left,
-         and three.js flips canvas textures by default to paper over that for
-         its own geometry. On a glTF mesh the two conventions cancel the wrong
-         way round and the grass came out growing downwards. */
-      tex.flipY = false;
-      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-      tex.repeat.set(140 / 7, 90 / 7);
-      tex.generateMipmaps = true;
-      tex.minFilter = THREE.LinearMipmapLinearFilter;
-      tex.magFilter = THREE.LinearFilter;
-      tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-      resolve(tex);
-    };
-    img.onerror = () => resolve(null);
-    img.src = url;
-  });
+  const c = document.createElement('canvas');
+  c.width = c.height = N;
+  const ctx = c.getContext('2d');
+  const img = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      const u = x / N, v = y / N;
+      const n = (broad(u, v) - 0.5) * 0.085
+              + (mid(u, v) - 0.5) * 0.05
+              + (fine(u, v) - 0.5) * 0.022;
+      const val = Math.max(0, Math.min(1, 1.0 + n - 0.05)) * 255;
+      const i = (y * N + x) * 4;
+      img.data[i] = img.data[i + 1] = img.data[i + 2] = val;
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  // The plane is 140 x 90 world units; one tile every ~7 units keeps a patch
+  // a believable size on the ground rather than a pattern painted on it.
+  tex.repeat.set(140 / 7, 90 / 7);
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
 }
 
 const STONE_GEO = roundedRect(STONE_W, STONE_H, STONE_H * 0.34);
@@ -804,14 +705,6 @@ function wrapSpan(v, span) {
   const half = span * 0.5;
   return ((v + half) % span + span) % span - half;
 }
-
-await Promise.all([
-  loadGroundTexture('assets/tex/grass.png').then((t) => { GROUND_TEX = t; }),
-  loadSurface('rock_near', 'assets/tex/rock_near.png'),
-  loadSurface('rock_far', 'assets/tex/rock_far.png'),
-  loadSurface('rock_fuji', 'assets/tex/rock_fuji.png'),
-  loadSurface('ice', 'assets/tex/ice_surface.png'),
-]);
 
 new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272', (gltf) => {
   world = gltf.scene;
