@@ -357,72 +357,6 @@ camera.lookAt(0, BASE_Y - 3.0, 0);
 // while sky and ground are being judged on their own.
 // No lights: every material is unlit, so nothing here would read them.
 
-/* CC0 PIXEL PARALLAX. Artist-made layers from OpenGameArt (Fabio, public
-   domain, no attribution required) hung off the camera as screen-space
-   quads. Nearest filtering, because pixel art resampled smoothly turns to
-   mush and shimmers the moment anything moves.
-
-   Only the mountains and clouds are taken. The pack's own sky is a loud
-   synthwave gradient; ours stays, so the day-night palette keeps working
-   behind them.
-
-   Each layer is fitted by WIDTH and offset vertically by the climb times its
-   own factor - classic layer parallax, since a flat pixel layer has no depth
-   for a perspective camera to work with. */
-const PIXEL_LAYERS = [
-  { file: 'cloud3.png',  y: 0.30, factor: 0.05, drift: 0.006, scale: 1.0 },
-  { file: 'mtn_far.png', y: 0.02, factor: 0.10, drift: 0,     scale: 1.0 },
-  { file: 'cloud2.png',  y: 0.18, factor: 0.07, drift: 0.010, scale: 1.0 },
-  { file: 'mtn_near.png',y: -0.01, factor: 0.16, drift: 0,    scale: 1.0 },
-  { file: 'cloud1.png',  y: 0.10, factor: 0.09, drift: 0.015, scale: 1.0 },
-];
-const pixelLayers = [];
-
-function loadPixelLayers() {
-  const loader = new THREE.TextureLoader();
-  const dist = 400;
-  return Promise.all(PIXEL_LAYERS.map((spec, i) => new Promise((resolve) => {
-    loader.load('assets/oga/' + spec.file, (tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace;
-      tex.magFilter = tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
-      tex.wrapS = THREE.RepeatWrapping;
-      const mesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(1, 1),
-        new THREE.MeshBasicMaterial({ map: tex, transparent: true,
-                                      depthWrite: false }));
-      mesh.renderOrder = -100 + i;
-      mesh.position.z = -dist;
-      camera.add(mesh);
-      pixelLayers.push({ ...spec, mesh, tex, dist,
-                         aspect: tex.image.width / tex.image.height });
-      resolve();
-    }, undefined, () => resolve());
-  }))).then(() => { scene.add(camera); fitPixelLayers(); });
-}
-
-function fitPixelLayers() {
-  for (const L of pixelLayers) {
-    const h = 2 * L.dist * Math.tan(THREE.MathUtils.degToRad(24) / 2);
-    const w = h * (innerWidth / innerHeight);
-    // Fit by width, so the whole drawing is on screen rather than cropped.
-    const lw = w * L.scale, lh = lw / L.aspect;
-    L.mesh.scale.set(lw, lh, 1);
-    /* Anchored by the BOTTOM edge, not the centre. The mountains sat in the
-       lower half of their source image with transparency above, so centring
-       the quad buried them under the ground while the empty half showed. The
-       art is cropped to its own bounds now and placed by where it stands. */
-    L.baseY = h * L.y + lh * 0.5;
-  }
-}
-
-function updatePixelLayers(climb, now) {
-  for (const L of pixelLayers) {
-    L.mesh.position.y = (L.baseY || 0) - climb * L.factor;
-    if (L.drift) L.tex.offset.x = (now * L.drift) % 1;
-  }
-}
-
 let world = null;
 let fuji = null;
 let fujiBaseY = 0;
@@ -871,8 +805,6 @@ function wrapSpan(v, span) {
   return ((v + half) % span + span) % span - half;
 }
 
-await loadPixelLayers();
-
 await Promise.all([
   loadGroundTexture('assets/tex/grass.png').then((t) => { GROUND_TEX = t; }),
   loadSurface('rock_near', 'assets/tex/rock_near.png'),
@@ -922,9 +854,6 @@ new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272',
     // the intended value rather than being darkened twice.
     node.userData.vc = vc;
     tinted.push(node);
-  });
-  world.traverse((n) => {
-    if (n.isMesh && /^(mtn_|cloud|sun$|fuji_snow$)/.test(n.name)) n.visible = false;
   });
   scene.add(world);
   status.hidden = true;
