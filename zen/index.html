@@ -590,6 +590,11 @@ function loadGroundTexture(url) {
 
       const tex = new THREE.CanvasTexture(c);
       tex.colorSpace = THREE.SRGBColorSpace;
+      /* glTF puts the UV origin at the top-left, a canvas at the bottom-left,
+         and three.js flips canvas textures by default to paper over that for
+         its own geometry. On a glTF mesh the two conventions cancel the wrong
+         way round and the grass came out growing downwards. */
+      tex.flipY = false;
       tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
       tex.repeat.set(140 / 7, 90 / 7);
       tex.generateMipmaps = true;
