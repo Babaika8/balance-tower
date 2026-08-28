@@ -523,7 +523,6 @@ const STONE_LAYER = 0.012;
 function makeStoneMesh(index) {
   const mesh = new THREE.Mesh(STONE_GEO, new THREE.MeshBasicMaterial({
     side: THREE.DoubleSide,
-    map: STONE_TEX[index % STONE_TEX.length],
   }));
   // Alternating shades, or a stack of identical slabs reads as one block.
   mesh.userData.shade = index % 2 ? 0.06 : -0.04;
@@ -585,7 +584,7 @@ function startPhysics() {
     .setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min), ground);
 
   const slab = new THREE.Mesh(roundedRect(BASE_HALF * 2, 2.0, 0.18),
-    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, map: STONE_TEX[0] }));
+    new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
   slab.position.set(0, BASE_TOP - 1.0, -STONE_LAYER);
   slab.userData.z = -STONE_LAYER;
   slab.userData.shade = -0.08;
@@ -710,6 +709,7 @@ new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272',
   world = gltf.scene;
   world.traverse((node) => {
     if (node.name === 'mtn_fuji') { fuji = node; fujiBaseY = node.position.y; }
+    if (node.name === 'fuji_snow') node.visible = false;   // snow cap removed
     if (node.name === 'sun') { sun = node; sunBaseY = node.position.y; }
     const prefix = node.name.startsWith('cloudhi_') ? 'cloudhi_'
                  : node.name.startsWith('cloudlo_') ? 'cloudlo_' : null;
@@ -734,11 +734,6 @@ new GLTFLoader().load('assets/zen_scene.glb?v=63073eb79db6c57a22ddaa4cb06d6272',
     // arrived double sided and swapping to a default basic one culled every
     // card whose winding faced away, which made the mountains vanish.
     const vs = { vertexColors: vc, side: THREE.DoubleSide };
-    const shape = SILHOUETTE[node.name];
-    if (shape) {
-      vs.map = makeSilhouetteTexture(buildSkyline(node.geometry, 192), shape);
-    }
-    if (node.name === 'ground_near') vs.map = GROUND_TEX;
     node.material = new THREE.MeshBasicMaterial(vs);
     // Authored colour kept aside: the phase tint multiplies it every frame,
     // so it must not be overwritten in place.
